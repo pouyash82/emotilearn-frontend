@@ -1,33 +1,28 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import API from '../api'
+import AnimatedBackground from '../components/AnimatedBackground'
+import TypingText from '../components/TypingText'
+import GlassCard from '../components/GlassCard'
 
 export default function Login() {
-  const [form,    setForm   ] = useState({ email: '', password: '' })
-  const [error,   setError  ] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
   const [showPass, setShowPass] = useState(false)
-  const { login } = useAuth()
-  const navigate  = useNavigate()
+  const { login }               = useAuth()
+  const navigate                = useNavigate()
 
-  const handleSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    if (form.password.length < 6) {
-      setError('Password must be at least 6 characters')
-      return
-    }
     setLoading(true)
     try {
-      const res = await API.post('/auth/login', form)
+      const res = await API.post('/auth/login', { email, password })
       login(res.data.user, res.data.access_token)
-      if (res.data.user.role === 'teacher' ||
-          res.data.user.role === 'admin') {
-        navigate('/teacher')
-      } else {
-        navigate('/student')
-      }
+      navigate(res.data.user.role === 'teacher' ? '/teacher' : '/dashboard')
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed')
     } finally {
@@ -36,121 +31,163 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center
-                    justify-center bg-dark px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative">
+      {/* Animated particle background */}
+      <AnimatedBackground />
+      
+      {/* Gradient overlay */}
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950 z-0" />
+      
+      {/* Floating gradient orbs */}
+      <div className="fixed top-1/4 left-1/4 w-96 h-96 bg-purple-600/30 rounded-full blur-3xl animate-float" />
+      <div className="fixed bottom-1/4 right-1/4 w-80 h-80 bg-pink-600/20 rounded-full blur-3xl animate-float-delayed" />
+      <div className="fixed top-1/2 right-1/3 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl animate-float-slow" />
 
-        {/* Logo */}
+      {/* Main content */}
+      <div className="relative z-10 w-full max-w-md animate-fade-in-up">
+        
+        {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🧠</div>
-          <h1 className="text-3xl font-bold text-purple-400">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg shadow-purple-500/30 mb-6 animate-bounce-slow">
+            <span className="text-4xl">🧠</span>
+          </div>
+          <h1 className="text-4xl font-black bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent mb-2">
             EmotiLearn
           </h1>
-          <p className="text-gray-500 mt-2">
-            Learning Profile Recognition System
+          <p className="text-gray-400">
+            <TypingText 
+              texts={[
+                'AI-Powered Learning',
+                'Emotion Recognition',
+                'Smart Education',
+                'Track Your Progress'
+              ]}
+              speed={80}
+              className="text-purple-400"
+            />
           </p>
         </div>
 
-        {/* Card */}
-        <div className="bg-card border border-border
-                        rounded-2xl p-8">
-          <h2 className="text-xl font-semibold mb-6">
-            Sign in to your account
+        {/* Login Card */}
+        <GlassCard glow className="p-8">
+          <h2 className="text-2xl font-bold text-white mb-6 text-center">
+            Welcome Back
           </h2>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30
-                            text-red-400 rounded-lg px-4 py-3
-                            mb-4 text-sm">
+            <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm animate-shake">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email */}
-            <div>
-              <label className="text-sm text-gray-400 mb-1 block">
+            <div className="group">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
                 Email
               </label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={e => setForm({...form,
-                  email: e.target.value})}
-                className="w-full bg-dark border border-border
-                           rounded-lg px-4 py-3 text-white
-                           focus:outline-none focus:border-primary
-                           transition-colors"
-                placeholder="you@university.edu"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-5 py-4 rounded-2xl
+                           bg-white/5 border border-white/10
+                           text-white placeholder-gray-500
+                           focus:outline-none focus:border-purple-500/50 focus:bg-white/10
+                           focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
+                           transition-all duration-300"
+                  placeholder="you@example.com"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">
+                  ✉️
+                </span>
+              </div>
             </div>
 
             {/* Password */}
-            <div>
-              <label className="text-sm text-gray-400 mb-1 block">
+            <div className="group">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
                 Password
               </label>
               <div className="relative">
                 <input
                   type={showPass ? 'text' : 'password'}
-                  value={form.password}
-                  onChange={e => setForm({...form,
-                    password: e.target.value})}
-                  maxLength={72}
-                  className="w-full bg-dark border border-border
-                             rounded-lg px-4 py-3 pr-12 text-white
-                             focus:outline-none focus:border-primary
-                             transition-colors"
-                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="w-full px-5 py-4 rounded-2xl
+                           bg-white/5 border border-white/10
+                           text-white placeholder-gray-500
+                           focus:outline-none focus:border-purple-500/50 focus:bg-white/10
+                           focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
+                           transition-all duration-300"
+                  placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2
-                             text-gray-500 hover:text-gray-300
-                             transition-colors text-lg select-none"
-                  tabIndex={-1}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                 >
                   {showPass ? '🙈' : '👁️'}
                 </button>
               </div>
-              {form.password.length > 0 && (
-                <div className="flex justify-between mt-1">
-                  <span className="text-xs text-gray-600">
-                    {form.password.length}/72 characters
-                  </span>
-                  {form.password.length < 6 && (
-                    <span className="text-xs text-red-400">
-                      Too short
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
 
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary hover:bg-purple-700
-                         text-white font-semibold py-3 rounded-lg
-                         transition-colors disabled:opacity-50
-                         disabled:cursor-not-allowed mt-2"
+              className="w-full py-4 rounded-2xl font-bold text-white
+                       bg-gradient-to-r from-purple-600 to-pink-600
+                       hover:from-purple-500 hover:to-pink-500
+                       shadow-lg shadow-purple-500/30
+                       hover:shadow-purple-500/50 hover:scale-[1.02]
+                       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
+                       transition-all duration-300
+                       relative overflow-hidden group"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {loading ? (
+                  <>
+                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </>
+                )}
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-pink-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
           </form>
 
-          <p className="text-center text-gray-500 text-sm mt-6">
+          {/* Divider */}
+          <div className="flex items-center my-6">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            <span className="px-4 text-gray-500 text-sm">or</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+          </div>
+
+          {/* Register link */}
+          <p className="text-center text-gray-400">
             Don't have an account?{' '}
-            <Link to="/register"
-                  className="text-purple-400 hover:text-purple-300">
-              Register
+            <Link 
+              to="/register" 
+              className="text-purple-400 hover:text-purple-300 font-medium hover:underline transition-colors"
+            >
+              Create one
             </Link>
           </p>
-        </div>
+        </GlassCard>
+
+        {/* Footer */}
+        <p className="text-center text-gray-600 text-sm mt-8">
+          © 2026 EmotiLearn • AI-Powered Education
+        </p>
       </div>
     </div>
   )

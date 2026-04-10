@@ -1,75 +1,43 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import API from '../api'
-
-function PasswordStrength({ password }) {
-  const getStrength = () => {
-    if (password.length === 0) return { level: 0, label: '', color: '' }
-    if (password.length < 6)   return { level: 1, label: 'Too short', color: '#ef4444' }
-    if (password.length < 8)   return { level: 2, label: 'Weak', color: '#f97316' }
-    const hasUpper  = /[A-Z]/.test(password)
-    const hasNum    = /[0-9]/.test(password)
-    const hasSymbol = /[^A-Za-z0-9]/.test(password)
-    const score     = [hasUpper, hasNum, hasSymbol]
-                      .filter(Boolean).length
-    if (score === 0) return { level: 2, label: 'Weak',   color: '#f97316' }
-    if (score === 1) return { level: 3, label: 'Fair',   color: '#eab308' }
-    if (score === 2) return { level: 4, label: 'Good',   color: '#22c55e' }
-    return            { level: 5, label: 'Strong', color: '#7c3aed' }
-  }
-
-  const { level, label, color } = getStrength()
-  if (password.length === 0) return null
-
-  return (
-    <div className="mt-2">
-      <div className="flex gap-1 mb-1">
-        {[1,2,3,4,5].map(i => (
-          <div key={i}
-               className="h-1 flex-1 rounded-full transition-all"
-               style={{ background: i <= level ? color : '#2d2d4e' }}
-          />
-        ))}
-      </div>
-      <div className="flex justify-between">
-        <span className="text-xs" style={{ color }}>
-          {label}
-        </span>
-        <span className="text-xs text-gray-600">
-          {password.length}/72
-        </span>
-      </div>
-    </div>
-  )
-}
+import AnimatedBackground from '../components/AnimatedBackground'
+import TypingText from '../components/TypingText'
+import GlassCard from '../components/GlassCard'
 
 export default function Register() {
-  const [form, setForm] = useState({
-    name: '', email: '', password: '', role: 'student'
-  })
-  const [error,    setError   ] = useState('')
-  const [loading,  setLoading ] = useState(false)
+  const [name, setName]         = useState('')
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole]         = useState('student')
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
   const [showPass, setShowPass] = useState(false)
-  const { login } = useAuth()
-  const navigate  = useNavigate()
+  const { login }               = useAuth()
+  const navigate                = useNavigate()
 
-  const handleSubmit = async e => {
+  const strength = password.length === 0 ? 0
+                 : password.length < 4 ? 1
+                 : password.length < 6 ? 2
+                 : password.length < 8 ? 3
+                 : password.length < 12 ? 4 : 5
+
+  const strengthColors = ['', 'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500']
+  const strengthLabels = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Excellent']
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
-    if (form.password.length < 6) {
+    if (password.length < 6) {
       setError('Password must be at least 6 characters')
       return
     }
-    if (form.name.trim().length < 2) {
-      setError('Please enter your full name')
-      return
-    }
+    setError('')
     setLoading(true)
     try {
-      const res = await API.post('/auth/register', form)
+      const res = await API.post('/auth/register', { name, email, password, role })
       login(res.data.user, res.data.access_token)
-      navigate(form.role === 'student' ? '/student' : '/teacher')
+      navigate(res.data.user.role === 'teacher' ? '/teacher' : '/dashboard')
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed')
     } finally {
@@ -78,150 +46,232 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center
-                    justify-center bg-dark px-4 py-8">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative">
+      {/* Animated particle background */}
+      <AnimatedBackground />
+      
+      {/* Gradient overlay */}
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950 z-0" />
+      
+      {/* Floating gradient orbs */}
+      <div className="fixed top-1/4 right-1/4 w-96 h-96 bg-pink-600/30 rounded-full blur-3xl animate-float" />
+      <div className="fixed bottom-1/4 left-1/4 w-80 h-80 bg-purple-600/20 rounded-full blur-3xl animate-float-delayed" />
+      <div className="fixed top-1/3 left-1/2 w-64 h-64 bg-cyan-600/20 rounded-full blur-3xl animate-float-slow" />
 
+      {/* Main content */}
+      <div className="relative z-10 w-full max-w-md animate-fade-in-up">
+        
+        {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🧠</div>
-          <h1 className="text-3xl font-bold text-purple-400">
-            EmotiLearn
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-pink-500 to-purple-500 shadow-lg shadow-pink-500/30 mb-6 animate-bounce-slow">
+            <span className="text-4xl">🎓</span>
+          </div>
+          <h1 className="text-4xl font-black bg-gradient-to-r from-white via-pink-200 to-purple-200 bg-clip-text text-transparent mb-2">
+            Join EmotiLearn
           </h1>
-          <p className="text-gray-500 mt-2">Create your account</p>
+          <p className="text-gray-400">
+            <TypingText 
+              texts={[
+                'Start your journey',
+                'Learn with AI',
+                'Track emotions',
+                'Boost engagement'
+              ]}
+              speed={80}
+              className="text-pink-400"
+            />
+          </p>
         </div>
 
-        <div className="bg-card border border-border
-                        rounded-2xl p-8">
-          <h2 className="text-xl font-semibold mb-6">
-            Get started
+        {/* Register Card */}
+        <GlassCard glow className="p-8">
+          <h2 className="text-2xl font-bold text-white mb-6 text-center">
+            Create Account
           </h2>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30
-                            text-red-400 rounded-lg px-4 py-3
-                            mb-4 text-sm">
+            <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm animate-shake">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Name */}
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
                 Full Name
               </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={e => setForm({...form,
-                  name: e.target.value})}
-                maxLength={100}
-                className="w-full bg-dark border border-border
-                           rounded-lg px-4 py-3 text-white
-                           focus:outline-none focus:border-primary
-                           transition-colors"
-                placeholder="Mohammad Shafizadeh"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full px-5 py-4 rounded-2xl
+                           bg-white/5 border border-white/10
+                           text-white placeholder-gray-500
+                           focus:outline-none focus:border-purple-500/50 focus:bg-white/10
+                           focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
+                           transition-all duration-300"
+                  placeholder="John Doe"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">
+                  👤
+                </span>
+              </div>
             </div>
 
             {/* Email */}
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
                 Email
               </label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={e => setForm({...form,
-                  email: e.target.value})}
-                className="w-full bg-dark border border-border
-                           rounded-lg px-4 py-3 text-white
-                           focus:outline-none focus:border-primary
-                           transition-colors"
-                placeholder="you@university.edu"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-5 py-4 rounded-2xl
+                           bg-white/5 border border-white/10
+                           text-white placeholder-gray-500
+                           focus:outline-none focus:border-purple-500/50 focus:bg-white/10
+                           focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
+                           transition-all duration-300"
+                  placeholder="you@example.com"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">
+                  ✉️
+                </span>
+              </div>
             </div>
 
             {/* Password */}
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
                 Password
               </label>
               <div className="relative">
                 <input
                   type={showPass ? 'text' : 'password'}
-                  value={form.password}
-                  onChange={e => setForm({...form,
-                    password: e.target.value})}
-                  maxLength={72}
-                  className="w-full bg-dark border border-border
-                             rounded-lg px-4 py-3 pr-12 text-white
-                             focus:outline-none focus:border-primary
-                             transition-colors"
-                  placeholder="Min. 6 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
+                  maxLength={72}
+                  className="w-full px-5 py-4 rounded-2xl
+                           bg-white/5 border border-white/10
+                           text-white placeholder-gray-500
+                           focus:outline-none focus:border-purple-500/50 focus:bg-white/10
+                           focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
+                           transition-all duration-300"
+                  placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2
-                             text-gray-500 hover:text-gray-300
-                             transition-colors text-lg select-none"
-                  tabIndex={-1}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                 >
                   {showPass ? '🙈' : '👁️'}
                 </button>
               </div>
-              <PasswordStrength password={form.password} />
+              
+              {/* Password strength */}
+              {password && (
+                <div className="mt-3 space-y-2 animate-fade-in">
+                  <div className="flex gap-1">
+                    {[1,2,3,4,5].map(i => (
+                      <div 
+                        key={i}
+                        className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                          i <= strength ? strengthColors[strength] : 'bg-gray-700'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className={`${strengthColors[strength].replace('bg-', 'text-')}`}>
+                      {strengthLabels[strength]}
+                    </span>
+                    <span className="text-gray-500">{password.length}/72</span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Role */}
+            {/* Role Selection */}
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">
+              <label className="block text-sm font-medium text-gray-300 mb-3">
                 I am a...
               </label>
               <div className="grid grid-cols-2 gap-3">
-                {['student', 'teacher'].map(role => (
+                {[
+                  { value: 'student', icon: '🎓', label: 'Student' },
+                  { value: 'teacher', icon: '👨‍🏫', label: 'Teacher' }
+                ].map((option) => (
                   <button
-                    key={role}
+                    key={option.value}
                     type="button"
-                    onClick={() => setForm({...form, role})}
-                    className={`py-3 rounded-lg border font-medium
-                                capitalize transition-colors
-                                ${form.role === role
-                                  ? 'bg-primary border-primary text-white'
-                                  : 'bg-dark border-border text-gray-400 hover:border-primary'
-                                }`}
+                    onClick={() => setRole(option.value)}
+                    className={`p-4 rounded-2xl border transition-all duration-300
+                      ${role === option.value 
+                        ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/30 border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' 
+                        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                      }`}
                   >
-                    {role === 'student' ? '🎓 Student' : '👨‍🏫 Teacher'}
+                    <span className="text-2xl block mb-1">{option.icon}</span>
+                    <span className="text-white font-medium">{option.label}</span>
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading || form.password.length < 6}
-              className="w-full bg-primary hover:bg-purple-700
-                         text-white font-semibold py-3 rounded-lg
-                         transition-colors disabled:opacity-50
-                         disabled:cursor-not-allowed mt-2"
+              disabled={loading || password.length < 6}
+              className="w-full py-4 rounded-2xl font-bold text-white
+                       bg-gradient-to-r from-pink-600 to-purple-600
+                       hover:from-pink-500 hover:to-purple-500
+                       shadow-lg shadow-pink-500/30
+                       hover:shadow-pink-500/50 hover:scale-[1.02]
+                       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
+                       transition-all duration-300
+                       relative overflow-hidden group"
             >
-              {loading ? 'Creating account...' : 'Create Account'}
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {loading ? (
+                  <>
+                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  <>
+                    Create Account
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </>
+                )}
+              </span>
             </button>
           </form>
 
-          <p className="text-center text-gray-500 text-sm mt-6">
+          {/* Divider */}
+          <div className="flex items-center my-6">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            <span className="px-4 text-gray-500 text-sm">or</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+          </div>
+
+          {/* Login link */}
+          <p className="text-center text-gray-400">
             Already have an account?{' '}
-            <Link to="/login"
-                  className="text-purple-400 hover:text-purple-300">
+            <Link 
+              to="/login" 
+              className="text-purple-400 hover:text-purple-300 font-medium hover:underline transition-colors"
+            >
               Sign in
             </Link>
           </p>
-        </div>
+        </GlassCard>
       </div>
     </div>
   )
