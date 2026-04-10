@@ -73,7 +73,7 @@ export default function Register() {
             <TypingText 
               texts={[
                 'Start your journey',
-                'Learn with AI',
+                'Start learning',
                 'Track emotions',
                 'Boost engagement'
               ]}

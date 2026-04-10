@@ -57,7 +57,7 @@ export default function Login() {
           <p className="text-gray-400">
             <TypingText 
               texts={[
-                'AI-Powered Learning',
+                
                 'Emotion Recognition',
                 'Smart Education',
                 'Track Your Progress'
@@ -186,7 +186,7 @@ export default function Login() {
 
         {/* Footer */}
         <p className="text-center text-gray-600 text-sm mt-8">
-          © 2026 EmotiLearn • AI-Powered Education
+          © 2026 EmotiLearn • Learning Profile System
         </p>
       </div>
     </div>

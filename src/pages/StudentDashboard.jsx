@@ -200,7 +200,7 @@ export default function StudentDashboard() {
             </h1>
             <p className="text-gray-400">
               <TypingText
-                texts={['Track your emotions', 'Boost engagement', 'Learn smarter', 'AI-powered insights']}
+                texts={['Track your emotions', 'Boost engagement', 'Learn smarter', 'Track your growth']}
                 speed={60}
                 className="text-purple-400"
               />
