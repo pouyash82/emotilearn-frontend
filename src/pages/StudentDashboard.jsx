@@ -7,7 +7,7 @@ import API from '../api'
 
 const EMOTION_COLORS = {
   anger    : { color: '#ef4444', gradient: 'from-red-500 to-orange-500' },
-  disgust  : { color: '#a855f7', gradient: 'from-purple-500 to-violet-500' },
+  disgust  : { color: '#a855f7', gradient: 'from-blue-500 to-violet-500' },
   fear     : { color: '#f97316', gradient: 'from-orange-500 to-amber-500' },
   happiness: { color: '#22c55e', gradient: 'from-green-500 to-emerald-500' },
   neutral  : { color: '#6b7280', gradient: 'from-gray-500 to-slate-500' },
@@ -185,8 +185,8 @@ export default function StudentDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Floating orbs */}
-      <div className="fixed top-20 left-10 w-72 h-72 bg-purple-600/20 rounded-full blur-3xl animate-float pointer-events-none" />
-      <div className="fixed bottom-20 right-10 w-96 h-96 bg-pink-600/10 rounded-full blur-3xl animate-float-delayed pointer-events-none" />
+      <div className="fixed top-20 left-10 w-72 h-72 bg-blue-600/20 rounded-full blur-3xl animate-float pointer-events-none" />
+      <div className="fixed bottom-20 right-10 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-float-delayed pointer-events-none" />
       <div className="fixed top-1/2 left-1/2 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl animate-float-slow pointer-events-none" />
       
       <Navbar />
@@ -196,13 +196,13 @@ export default function StudentDashboard() {
         <div className="flex items-center justify-between mb-8 animate-fade-in-up">
           <div>
             <h1 className="text-3xl font-black text-white mb-2">
-              Welcome back, <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">{user?.name}</span> 👋
+              Welcome back, <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">{user?.name}</span> 👋
             </h1>
             <p className="text-gray-400">
               <TypingText
                 texts={['Track your emotions', 'Boost engagement', 'Learn smarter', 'Track your growth']}
                 speed={60}
-                className="text-purple-400"
+                className="text-blue-400"
               />
             </p>
           </div>
@@ -217,7 +217,7 @@ export default function StudentDashboard() {
               ].map((s, i) => (
                 <GlassCard key={s.label} className="px-5 py-4 text-center animate-fade-in-up" style={{ animationDelay: `${i * 100}ms` }}>
                   <div className="text-2xl mb-1">{s.icon}</div>
-                  <div className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  <div className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
                     {s.value}
                   </div>
                   <div className="text-xs text-gray-500">{s.label}</div>
@@ -235,7 +235,7 @@ export default function StudentDashboard() {
               onClick={() => setTab(t)}
               className={`px-6 py-3 rounded-2xl font-medium transition-all duration-300 ${
                 tab === t
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
                   : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
               }`}
             >
@@ -270,8 +270,8 @@ export default function StudentDashboard() {
                 <button
                   onClick={stopSession}
                   className="px-8 py-4 rounded-2xl font-bold text-white
-                           bg-gradient-to-r from-red-500 to-pink-500
-                           hover:from-red-400 hover:to-pink-400
+                           bg-gradient-to-r from-red-500 to-indigo-500
+                           hover:from-red-400 hover:to-indigo-400
                            shadow-lg shadow-red-500/30 hover:shadow-red-500/50
                            hover:scale-105 transition-all duration-300 animate-pulse"
                 >
@@ -366,9 +366,9 @@ export default function StudentDashboard() {
                     <button
                       onClick={startRecording}
                       className="px-6 py-3 rounded-2xl font-medium text-white
-                               bg-gradient-to-r from-purple-600 to-pink-600
-                               hover:from-purple-500 hover:to-pink-500
-                               shadow-lg shadow-purple-500/30 hover:scale-105
+                               bg-gradient-to-r from-blue-600 to-indigo-600
+                               hover:from-blue-500 hover:to-indigo-500
+                               shadow-lg shadow-blue-500/30 hover:scale-105
                                transition-all duration-300"
                     >
                       🎤 Start Recording
@@ -377,7 +377,7 @@ export default function StudentDashboard() {
                     <button
                       onClick={stopRecording}
                       className="px-6 py-3 rounded-2xl font-medium text-white
-                               bg-gradient-to-r from-red-500 to-pink-500
+                               bg-gradient-to-r from-red-500 to-indigo-500
                                shadow-lg shadow-red-500/30 animate-pulse
                                transition-all duration-300"
                     >
@@ -500,7 +500,7 @@ export default function StudentDashboard() {
                           <div className="text-xs text-gray-500">Engagement</div>
                         </div>
                         <div className="text-center">
-                          <div className="font-bold text-purple-400 capitalize">{s.dominant_emotion}</div>
+                          <div className="font-bold text-blue-400 capitalize">{s.dominant_emotion}</div>
                           <div className="text-xs text-gray-500">Dominant</div>
                         </div>
                         <div className="text-center">

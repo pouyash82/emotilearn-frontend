@@ -37,8 +37,8 @@ export default function AnimatedBackground() {
 
       getRandomColor() {
         const colors = [
-          'rgba(168, 85, 247, ',   // Purple
-          'rgba(236, 72, 153, ',   // Pink
+          'rgba(59, 130, 246, ',   // Purple
+          'rgba(99, 102, 241, ',   // Pink
           'rgba(59, 130, 246, ',   // Blue
           'rgba(34, 211, 238, ',   // Cyan
           'rgba(251, 146, 60, ',   // Orange
@@ -98,7 +98,7 @@ export default function AnimatedBackground() {
 
           if (distance < 120) {
             ctx.beginPath()
-            ctx.strokeStyle = `rgba(168, 85, 247, ${0.15 - distance / 800})`
+            ctx.strokeStyle = `rgba(59, 130, 246, ${0.15 - distance / 800})`
             ctx.lineWidth = 1
             ctx.moveTo(particles[a].x, particles[a].y)
             ctx.lineTo(particles[b].x, particles[b].y)

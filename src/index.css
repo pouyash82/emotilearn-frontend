@@ -8,8 +8,8 @@
 :root {
   --bg-primary: #0a0a0f;
   --bg-secondary: #12121a;
-  --accent-purple: #a855f7;
-  --accent-pink: #ec4899;
+  --accent-purple: #3b82f6;
+  --accent-pink: #6366f1;
   --accent-blue: #3b82f6;
   --glass-bg: rgba(255, 255, 255, 0.03);
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -55,7 +55,7 @@ body {
 
 /* ===== SELECTION ===== */
 ::selection {
-  background: rgba(168, 85, 247, 0.4);
+  background: rgba(59, 130, 246, 0.4);
   color: #fff;
 }
 
@@ -175,10 +175,10 @@ body {
 /* Pulse glow */
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
   }
   50% {
-    box-shadow: 0 0 40px rgba(168, 85, 247, 0.6);
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
   }
 }
 
@@ -296,7 +296,7 @@ body {
 
 /* ===== GLOW EFFECTS ===== */
 .glow-purple {
-  box-shadow: 0 0 30px rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
 }
 
 .glow-pink {
@@ -309,7 +309,7 @@ body {
 
 /* ===== TEXT GRADIENTS ===== */
 .text-gradient {
-  background: linear-gradient(135deg, #a855f7, #ec4899);
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -333,7 +333,7 @@ body {
 }
 
 .hover-glow:hover {
-  box-shadow: 0 0 40px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 40px rgba(59, 130, 246, 0.4);
 }
 
 /* ===== BUTTON STYLES ===== */

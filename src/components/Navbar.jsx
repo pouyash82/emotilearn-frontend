@@ -17,7 +17,7 @@ export default function Navbar() {
           
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 group-hover:scale-110 transition-all duration-300">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 group-hover:scale-110 transition-all duration-300">
               <span className="text-xl">🧠</span>
             </div>
             <span className="text-xl font-black bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
@@ -35,7 +35,7 @@ export default function Navbar() {
               </div>
               
               {/* Avatar */}
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white font-bold shadow-lg shadow-purple-500/20">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
                 {user?.role === 'teacher' ? '👨‍🏫' : '🎓'}
               </div>
             </div>
@@ -45,7 +45,7 @@ export default function Navbar() {
               px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider
               ${user?.role === 'teacher' 
                 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
-                : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
               }
             `}>
               {user?.role}

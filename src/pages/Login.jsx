@@ -36,11 +36,11 @@ export default function Login() {
       <AnimatedBackground />
       
       {/* Gradient overlay */}
-      <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950 z-0" />
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-slate-900/50 to-slate-950 z-0" />
       
       {/* Floating gradient orbs */}
-      <div className="fixed top-1/4 left-1/4 w-96 h-96 bg-purple-600/30 rounded-full blur-3xl animate-float" />
-      <div className="fixed bottom-1/4 right-1/4 w-80 h-80 bg-pink-600/20 rounded-full blur-3xl animate-float-delayed" />
+      <div className="fixed top-1/4 left-1/4 w-96 h-96 bg-blue-600/30 rounded-full blur-3xl animate-float" />
+      <div className="fixed bottom-1/4 right-1/4 w-80 h-80 bg-indigo-600/20 rounded-full blur-3xl animate-float-delayed" />
       <div className="fixed top-1/2 right-1/3 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl animate-float-slow" />
 
       {/* Main content */}
@@ -48,10 +48,10 @@ export default function Login() {
         
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg shadow-purple-500/30 mb-6 animate-bounce-slow">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 shadow-lg shadow-blue-500/30 mb-6 animate-bounce-slow">
             <span className="text-4xl">🧠</span>
           </div>
-          <h1 className="text-4xl font-black bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent mb-2">
+          <h1 className="text-4xl font-black bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-2">
             EmotiLearn
           </h1>
           <p className="text-gray-400">
@@ -63,7 +63,7 @@ export default function Login() {
                 'Track Your Progress'
               ]}
               speed={80}
-              className="text-purple-400"
+              className="text-blue-400"
             />
           </p>
         </div>
@@ -95,7 +95,7 @@ export default function Login() {
                   className="w-full px-5 py-4 rounded-2xl
                            bg-white/5 border border-white/10
                            text-white placeholder-gray-500
-                           focus:outline-none focus:border-purple-500/50 focus:bg-white/10
+                           focus:outline-none focus:border-blue-500/50 focus:bg-white/10
                            focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
                            transition-all duration-300"
                   placeholder="you@example.com"
@@ -120,7 +120,7 @@ export default function Login() {
                   className="w-full px-5 py-4 rounded-2xl
                            bg-white/5 border border-white/10
                            text-white placeholder-gray-500
-                           focus:outline-none focus:border-purple-500/50 focus:bg-white/10
+                           focus:outline-none focus:border-blue-500/50 focus:bg-white/10
                            focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
                            transition-all duration-300"
                   placeholder="••••••••"
@@ -140,10 +140,10 @@ export default function Login() {
               type="submit"
               disabled={loading}
               className="w-full py-4 rounded-2xl font-bold text-white
-                       bg-gradient-to-r from-purple-600 to-pink-600
-                       hover:from-purple-500 hover:to-pink-500
-                       shadow-lg shadow-purple-500/30
-                       hover:shadow-purple-500/50 hover:scale-[1.02]
+                       bg-gradient-to-r from-blue-600 to-indigo-600
+                       hover:from-blue-500 hover:to-indigo-500
+                       shadow-lg shadow-blue-500/30
+                       hover:shadow-blue-500/50 hover:scale-[1.02]
                        disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
                        transition-all duration-300
                        relative overflow-hidden group"
@@ -161,7 +161,7 @@ export default function Login() {
                   </>
                 )}
               </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-pink-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
           </form>
 
@@ -177,7 +177,7 @@ export default function Login() {
             Don't have an account?{' '}
             <Link 
               to="/register" 
-              className="text-purple-400 hover:text-purple-300 font-medium hover:underline transition-colors"
+              className="text-blue-400 hover:text-purple-300 font-medium hover:underline transition-colors"
             >
               Create one
             </Link>

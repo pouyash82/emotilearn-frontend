@@ -54,8 +54,8 @@ export default function Register() {
       <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950 z-0" />
       
       {/* Floating gradient orbs */}
-      <div className="fixed top-1/4 right-1/4 w-96 h-96 bg-pink-600/30 rounded-full blur-3xl animate-float" />
-      <div className="fixed bottom-1/4 left-1/4 w-80 h-80 bg-purple-600/20 rounded-full blur-3xl animate-float-delayed" />
+      <div className="fixed top-1/4 right-1/4 w-96 h-96 bg-indigo-600/30 rounded-full blur-3xl animate-float" />
+      <div className="fixed bottom-1/4 left-1/4 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl animate-float-delayed" />
       <div className="fixed top-1/3 left-1/2 w-64 h-64 bg-cyan-600/20 rounded-full blur-3xl animate-float-slow" />
 
       {/* Main content */}
@@ -63,7 +63,7 @@ export default function Register() {
         
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-pink-500 to-purple-500 shadow-lg shadow-pink-500/30 mb-6 animate-bounce-slow">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 shadow-lg shadow-indigo-500/30 mb-6 animate-bounce-slow">
             <span className="text-4xl">🎓</span>
           </div>
           <h1 className="text-4xl font-black bg-gradient-to-r from-white via-pink-200 to-purple-200 bg-clip-text text-transparent mb-2">
@@ -78,7 +78,7 @@ export default function Register() {
                 'Boost engagement'
               ]}
               speed={80}
-              className="text-pink-400"
+              className="text-indigo-400"
             />
           </p>
         </div>
@@ -110,7 +110,7 @@ export default function Register() {
                   className="w-full px-5 py-4 rounded-2xl
                            bg-white/5 border border-white/10
                            text-white placeholder-gray-500
-                           focus:outline-none focus:border-purple-500/50 focus:bg-white/10
+                           focus:outline-none focus:border-blue-500/50 focus:bg-white/10
                            focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
                            transition-all duration-300"
                   placeholder="John Doe"
@@ -135,7 +135,7 @@ export default function Register() {
                   className="w-full px-5 py-4 rounded-2xl
                            bg-white/5 border border-white/10
                            text-white placeholder-gray-500
-                           focus:outline-none focus:border-purple-500/50 focus:bg-white/10
+                           focus:outline-none focus:border-blue-500/50 focus:bg-white/10
                            focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
                            transition-all duration-300"
                   placeholder="you@example.com"
@@ -161,7 +161,7 @@ export default function Register() {
                   className="w-full px-5 py-4 rounded-2xl
                            bg-white/5 border border-white/10
                            text-white placeholder-gray-500
-                           focus:outline-none focus:border-purple-500/50 focus:bg-white/10
+                           focus:outline-none focus:border-blue-500/50 focus:bg-white/10
                            focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
                            transition-all duration-300"
                   placeholder="••••••••"
@@ -214,7 +214,7 @@ export default function Register() {
                     onClick={() => setRole(option.value)}
                     className={`p-4 rounded-2xl border transition-all duration-300
                       ${role === option.value 
-                        ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/30 border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' 
+                        ? 'bg-gradient-to-r from-blue-600/30 to-indigo-600/30 border-blue-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' 
                         : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                       }`}
                   >
@@ -230,10 +230,10 @@ export default function Register() {
               type="submit"
               disabled={loading || password.length < 6}
               className="w-full py-4 rounded-2xl font-bold text-white
-                       bg-gradient-to-r from-pink-600 to-purple-600
-                       hover:from-pink-500 hover:to-purple-500
-                       shadow-lg shadow-pink-500/30
-                       hover:shadow-pink-500/50 hover:scale-[1.02]
+                       bg-gradient-to-r from-indigo-600 to-blue-600
+                       hover:from-indigo-500 hover:to-blue-500
+                       shadow-lg shadow-indigo-500/30
+                       hover:shadow-indigo-500/50 hover:scale-[1.02]
                        disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
                        transition-all duration-300
                        relative overflow-hidden group"
@@ -266,7 +266,7 @@ export default function Register() {
             Already have an account?{' '}
             <Link 
               to="/login" 
-              className="text-purple-400 hover:text-purple-300 font-medium hover:underline transition-colors"
+              className="text-blue-400 hover:text-purple-300 font-medium hover:underline transition-colors"
             >
               Sign in
             </Link>

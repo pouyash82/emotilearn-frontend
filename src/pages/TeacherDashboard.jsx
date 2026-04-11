@@ -75,8 +75,8 @@ export default function TeacherDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Floating orbs */}
       <div className="fixed top-20 right-20 w-72 h-72 bg-amber-600/20 rounded-full blur-3xl animate-float pointer-events-none" />
-      <div className="fixed bottom-40 left-20 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-float-delayed pointer-events-none" />
-      <div className="fixed top-1/3 left-1/3 w-64 h-64 bg-pink-600/10 rounded-full blur-3xl animate-float-slow pointer-events-none" />
+      <div className="fixed bottom-40 left-20 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl animate-float-delayed pointer-events-none" />
+      <div className="fixed top-1/3 left-1/3 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl animate-float-slow pointer-events-none" />
 
       <Navbar />
 
@@ -195,7 +195,7 @@ export default function TeacherDashboard() {
                     <div className="space-y-3">
                       {students.slice(0, 3).map(s => (
                         <div key={s.id} className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-sm font-bold">
                             {s.name?.charAt(0) || '?'}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -325,7 +325,7 @@ export default function TeacherDashboard() {
                     >
                       <div className="flex items-center gap-4">
                         {/* Avatar */}
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-purple-500/20">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-blue-500/20">
                           {s.name?.charAt(0) || '?'}
                         </div>
 
@@ -348,7 +348,7 @@ export default function TeacherDashboard() {
                             <div className="text-xs text-gray-500">Engagement</div>
                           </div>
                           <div className="text-center">
-                            <div className="font-bold text-purple-400 capitalize">
+                            <div className="font-bold text-blue-400 capitalize">
                               {s.dominant_emotion || 'N/A'}
                             </div>
                             <div className="text-xs text-gray-500">Dominant</div>

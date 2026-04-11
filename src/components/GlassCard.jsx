@@ -17,7 +17,7 @@ export default function GlassCard({
       ${className}
     `}>
       {/* Gradient border effect */}
-      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-500/20 via-transparent to-pink-500/20 pointer-events-none" />
+      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-500/20 via-transparent to-indigo-500/20 pointer-events-none" />
       
       {/* Content */}
       <div className="relative z-10">
