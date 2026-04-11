@@ -18,6 +18,14 @@ export default function SessionReport({ sessionData, onClose }) {
     if (sessionData) generateReport(sessionData)
   }, [sessionData])
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+  }, [])
+
   const generateReport = (data) => {
     const { emotionHistory, duration, totalDetections } = data
     const emotionCounts = {}
@@ -88,56 +96,86 @@ export default function SessionReport({ sessionData, onClose }) {
   )
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-auto">
-      <GlassCard className="p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
-        <div className="flex justify-between mb-6">
-          <h2 className="text-2xl font-black text-white">📊 Session Report</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
-        </div>
-
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {[
-            { label: 'Duration', value: formatDuration(report.duration), icon: '⏱️' },
-            { label: 'Detections', value: report.totalDetections, icon: '📸' },
-            { label: 'Engagement', value: `${report.engagementScore}%`, icon: '⚡' },
-            { label: 'Dominant', value: report.dominantEmotion, icon: EMOTION_COLORS[report.dominantEmotion]?.emoji || '😐' },
-          ].map(stat => (
-            <div key={stat.label} className="bg-white/5 rounded-xl p-4 text-center">
-              <div className="text-2xl mb-1">{stat.icon}</div>
-              <div className="text-xl font-bold text-white">{stat.value}</div>
-              <div className="text-xs text-gray-500">{stat.label}</div>
+    <div 
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+      style={{ overflowY: 'scroll', WebkitOverflowScrolling: 'touch' }}
+    >
+      <div className="flex justify-center px-4 py-8">
+        <div className="w-full max-w-2xl">
+          <GlassCard className="p-6">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black text-white">📊 Session Report</h2>
+              <button 
+                onClick={onClose} 
+                className="text-gray-400 hover:text-white text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"
+              >
+                ✕
+              </button>
             </div>
-          ))}
-        </div>
 
-        <div className="bg-white/5 rounded-xl p-5 mb-6">
-          <h3 className="text-lg font-bold text-white mb-4">🎭 Emotion Distribution</h3>
-          <div className="space-y-3">
-            {Object.entries(report.emotionDistribution).sort((a,b) => b[1]-a[1]).map(([emotion, pct]) => (
-              <div key={emotion} className="flex items-center gap-3">
-                <span className="text-xl">{EMOTION_COLORS[emotion]?.emoji}</span>
-                <span className="w-24 text-gray-300 capitalize">{emotion}</span>
-                <div className="flex-1 h-4 bg-white/10 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: EMOTION_COLORS[emotion]?.hex }}/>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              {[
+                { label: 'Duration', value: formatDuration(report.duration), icon: '⏱️' },
+                { label: 'Detections', value: report.totalDetections, icon: '📸' },
+                { label: 'Engagement', value: `${report.engagementScore}%`, icon: '⚡' },
+                { label: 'Dominant', value: report.dominantEmotion, icon: EMOTION_COLORS[report.dominantEmotion]?.emoji || '😐' },
+              ].map(stat => (
+                <div key={stat.label} className="bg-white/5 rounded-xl p-3 text-center">
+                  <div className="text-xl mb-1">{stat.icon}</div>
+                  <div className="text-lg font-bold text-white truncate">{stat.value}</div>
+                  <div className="text-xs text-gray-500">{stat.label}</div>
                 </div>
-                <span className="w-12 text-right font-bold" style={{ color: EMOTION_COLORS[emotion]?.hex }}>{pct}%</span>
+              ))}
+            </div>
+
+            {/* Emotion Distribution */}
+            <div className="bg-white/5 rounded-xl p-4 mb-6">
+              <h3 className="text-lg font-bold text-white mb-3">🎭 Emotion Distribution</h3>
+              <div className="space-y-2">
+                {Object.entries(report.emotionDistribution).sort((a,b) => b[1]-a[1]).map(([emotion, pct]) => (
+                  <div key={emotion} className="flex items-center gap-2">
+                    <span className="text-lg">{EMOTION_COLORS[emotion]?.emoji}</span>
+                    <span className="w-20 text-gray-300 capitalize text-sm">{emotion}</span>
+                    <div className="flex-1 h-3 bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: EMOTION_COLORS[emotion]?.hex }}/>
+                    </div>
+                    <span className="w-10 text-right font-bold text-sm" style={{ color: EMOTION_COLORS[emotion]?.hex }}>{pct}%</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        <div className="bg-white/5 rounded-xl p-5 mb-6">
-          <h3 className="text-lg font-bold text-white mb-4">💡 Recommendations</h3>
-          {report.recommendations.map((rec, i) => (
-            <div key={i} className="bg-white/5 rounded-lg p-3 mb-2 text-gray-300">{rec}</div>
-          ))}
-        </div>
+            {/* Recommendations */}
+            <div className="bg-white/5 rounded-xl p-4 mb-6">
+              <h3 className="text-lg font-bold text-white mb-3">💡 Recommendations</h3>
+              {report.recommendations.map((rec, i) => (
+                <div key={i} className="bg-white/5 rounded-lg p-3 mb-2 text-gray-300 text-sm">{rec}</div>
+              ))}
+            </div>
 
-        <div className="flex gap-4">
-          <button onClick={downloadReport} className="flex-1 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-500">📥 Download Report</button>
-          <button onClick={onClose} className="px-6 py-3 rounded-xl text-gray-400 bg-white/5 border border-white/10">Close</button>
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button 
+                onClick={downloadReport} 
+                className="flex-1 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 transition-all"
+              >
+                📥 Download Report
+              </button>
+              <button 
+                onClick={onClose} 
+                className="px-6 py-3 rounded-xl text-gray-400 bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </GlassCard>
+          
+          {/* Extra padding at bottom for scroll */}
+          <div className="h-8"></div>
         </div>
-      </GlassCard>
+      </div>
     </div>
   )
 }
