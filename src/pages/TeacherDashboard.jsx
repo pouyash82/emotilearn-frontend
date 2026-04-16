@@ -19,6 +19,24 @@ const EMOTION_COLORS = {
 const engColor = (v) =>
   v >= 65 ? '#22c55e' : v >= 40 ? '#eab308' : '#ef4444'
 
+const engLabel = (v) =>
+  v >= 65 ? 'High' : v >= 40 ? 'Medium' : 'Low'
+
+const fmtDate = (iso) => {
+  if (!iso) return '—'
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString(undefined, {
+      month : 'short',
+      day   : 'numeric',
+      hour  : '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return '—'
+  }
+}
+
 export default function TeacherDashboard() {
   const { user } = useAuth()
   const [tab, setTab] = useState('overview')
@@ -221,17 +239,20 @@ export default function TeacherDashboard() {
                   <div className="bg-white/5 rounded-2xl p-5 border border-white/5">
                     <h3 className="text-gray-400 text-sm mb-4">Recent Activity</h3>
                     <div className="space-y-2">
-                      {students.slice(0, 4).map(s => (
-                        <div key={s.id} className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                            {s.name?.charAt(0) || '?'}
+                      {students
+                        .filter(s => s.total_sessions > 0)
+                        .slice(0, 4)
+                        .map(s => (
+                          <div key={s.id} className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                              {s.name?.charAt(0) || '?'}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-white text-sm truncate">{s.name}</div>
+                              <div className="text-gray-500 text-xs">{fmtDate(s.last_active)}</div>
+                            </div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-white text-sm truncate">{s.name}</div>
-                            <div className="text-gray-500 text-xs">Session completed</div>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 </div>
@@ -270,7 +291,7 @@ export default function TeacherDashboard() {
               <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                 <span className="text-2xl">➕</span> Create New Course
               </h2>
-              <form onSubmit={createCourse} className="flex gap-4">
+              <div className="flex gap-4">
                 <input
                   type="text"
                   placeholder="Course name"
@@ -286,13 +307,13 @@ export default function TeacherDashboard() {
                   className="flex-1 px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 focus:bg-white/10 transition-all duration-300"
                 />
                 <button
-                  type="submit"
+                  onClick={createCourse}
                   disabled={loading || !newCourse.name.trim()}
                   className="px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shadow-lg shadow-amber-500/30 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 transition-all duration-300"
                 >
                   {loading ? 'Creating...' : 'Create'}
                 </button>
-              </form>
+              </div>
             </GlassCard>
 
             <GlassCard className="p-6">
@@ -337,7 +358,13 @@ export default function TeacherDashboard() {
         {/* ═════════ STUDENTS TAB ═════════ */}
         {tab === 'students' && (
           <GlassCard className="p-6 animate-fade-in">
-            <h2 className="text-xl font-bold text-white mb-6">Student Progress</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Student Progress</h2>
+              <div className="text-sm text-gray-500">
+                Click any student to see their sessions and reports
+              </div>
+            </div>
+
             {students.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-5xl mb-4">🎓</div>
@@ -347,6 +374,7 @@ export default function TeacherDashboard() {
               <div className="space-y-4">
                 {students.map((s, i) => {
                   const c = engColor(s.avg_engagement || 0)
+                  const hasData = (s.total_sessions || 0) > 0
                   return (
                     <button
                       key={s.id}
@@ -359,8 +387,20 @@ export default function TeacherDashboard() {
                           {s.name?.charAt(0) || '?'}
                         </div>
                         <div className="flex-1">
-                          <div className="text-white font-medium">{s.name}</div>
+                          <div className="text-white font-medium flex items-center gap-2">
+                            {s.name}
+                            {hasData && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                                Active
+                              </span>
+                            )}
+                          </div>
                           <div className="text-gray-500 text-sm">{s.email}</div>
+                          {s.last_active && (
+                            <div className="text-gray-600 text-xs mt-0.5">
+                              Last session: {fmtDate(s.last_active)}
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-8">
                           <div className="text-center">
@@ -409,21 +449,30 @@ export default function TeacherDashboard() {
   )
 }
 
-/* ──────────────────────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════ */
 /*   Student analytics drill-down modal                                    */
-/* ──────────────────────────────────────────────────────────────────────── */
+/*   — shows aggregate profile + full session list + per-session downloads */
+/* ════════════════════════════════════════════════════════════════════════ */
 function StudentAnalyticsModal({ student, onClose }) {
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [profile, setProfile]     = useState(null)
+  const [sessions, setSessions]   = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [downloading, setDownloading] = useState(null) // session id being downloaded
   const c = engColor(student.avg_engagement || 0)
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true)
       try {
-        const res = await API.get(`/teacher/students/${student.id}/profile`)
-        setProfile(res.data)
+        const [p, s] = await Promise.all([
+          API.get(`/teacher/students/${student.id}/profile`),
+          API.get(`/teacher/students/${student.id}/sessions`),
+        ])
+        setProfile(p.data)
+        setSessions(s.data || [])
       } catch {
         setProfile(null)
+        setSessions([])
       }
       setLoading(false)
     }
@@ -432,15 +481,58 @@ function StudentAnalyticsModal({ student, onClose }) {
 
   const dist = profile?.distribution || {}
 
+  /* Open HTML report in a new tab — fetch via axios so the JWT header
+     is included, then create a blob URL the browser can open. */
+  const openReport = async (sessionId) => {
+    setDownloading(`report-${sessionId}`)
+    try {
+      const res = await API.get(
+        `/teacher/sessions/${sessionId}/report`,
+        { responseType: 'blob' },
+      )
+      const blob = new Blob([res.data], { type: 'text/html' })
+      const url  = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      // Give the new tab a minute to render before revoking
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      alert('Could not load report for this session.')
+    }
+    setDownloading(null)
+  }
+
+  /* Download CSV for a specific session. */
+  const downloadCSV = async (sessionId) => {
+    setDownloading(`csv-${sessionId}`)
+    try {
+      const res = await API.get(
+        `/teacher/sessions/${sessionId}/csv`,
+        { responseType: 'blob' },
+      )
+      const url = URL.createObjectURL(new Blob([res.data]))
+      const a   = document.createElement('a')
+      a.href    = url
+      a.download = `session_${sessionId}_${student.name.replace(/\s+/g, '_')}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('Could not download CSV for this session.')
+    }
+    setDownloading(null)
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="max-w-3xl w-full max-h-[90vh] overflow-y-auto bg-slate-900 border border-white/10 rounded-3xl shadow-2xl"
+        className="max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-slate-900 border border-white/10 rounded-3xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="p-6 border-b border-white/10 flex items-center justify-between sticky top-0 bg-slate-900 z-10">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-2xl font-bold">
@@ -491,9 +583,7 @@ function StudentAnalyticsModal({ student, onClose }) {
               <p className="text-gray-500 text-sm">Loading profile...</p>
             ) : Object.keys(dist).length === 0 ? (
               <div className="bg-white/5 rounded-2xl p-6 text-center text-gray-500 text-sm">
-                Detailed profile not available for this student yet.
-                <br />
-                Their distribution will appear here after they complete a session.
+                No distribution data yet — this student hasn't completed a session.
               </div>
             ) : (
               <div className="space-y-2">
@@ -518,11 +608,11 @@ function StudentAnalyticsModal({ student, onClose }) {
             )}
           </div>
 
-          {/* Engagement trend */}
+          {/* Engagement trend sparkline */}
           {profile?.engagement_trend && profile.engagement_trend.length > 0 && (
             <div>
               <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                <span className="text-xl">📈</span> Recent Engagement Trend
+                <span className="text-xl">📈</span> Engagement Trend (per session)
               </h3>
               <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
                 <div className="flex items-end gap-1 h-24">
@@ -544,6 +634,95 @@ function StudentAnalyticsModal({ student, onClose }) {
               </div>
             </div>
           )}
+
+          {/* ═════════ SESSION LIST WITH PER-SESSION DOWNLOADS ═════════ */}
+          <div>
+            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+              <span className="text-xl">📋</span> Session History
+              <span className="text-sm font-normal text-gray-500">
+                ({sessions.length})
+              </span>
+            </h3>
+
+            {loading ? (
+              <p className="text-gray-500 text-sm">Loading sessions...</p>
+            ) : sessions.length === 0 ? (
+              <div className="bg-white/5 rounded-2xl p-6 text-center text-gray-500 text-sm">
+                No sessions recorded yet.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {sessions.map((s) => {
+                  const sc = engColor(s.avg_engagement || 0)
+                  const isReportLoading = downloading === `report-${s.id}`
+                  const isCsvLoading    = downloading === `csv-${s.id}`
+                  return (
+                    <div
+                      key={s.id}
+                      className="bg-white/5 border border-white/5 hover:border-amber-500/20 rounded-2xl p-4 transition-all duration-300"
+                    >
+                      <div className="flex items-center gap-4 flex-wrap">
+                        {/* Session badge */}
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          #{s.id}
+                        </div>
+
+                        {/* Date */}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-white text-sm font-medium">
+                            {fmtDate(s.started_at)}
+                          </div>
+                          <div className="text-gray-500 text-xs">
+                            {s.total_detections || 0} detections
+                          </div>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="flex gap-6 shrink-0">
+                          <div className="text-center">
+                            <div className="text-sm font-bold" style={{ color: sc }}>
+                              {s.avg_engagement || 0}%
+                            </div>
+                            <div className="text-[10px] text-gray-500 uppercase">
+                              {engLabel(s.avg_engagement || 0)}
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-sm font-bold text-blue-400 capitalize">
+                              {s.dominant_emotion || '—'}
+                            </div>
+                            <div className="text-[10px] text-gray-500 uppercase">
+                              Dominant
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex gap-2 shrink-0">
+                          <button
+                            onClick={() => openReport(s.id)}
+                            disabled={isReportLoading}
+                            className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-medium hover:bg-amber-500/20 disabled:opacity-50 transition-all duration-300"
+                            title="Open HTML report in new tab"
+                          >
+                            {isReportLoading ? '...' : '📊 Report'}
+                          </button>
+                          <button
+                            onClick={() => downloadCSV(s.id)}
+                            disabled={isCsvLoading}
+                            className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs font-medium hover:bg-white/10 disabled:opacity-50 transition-all duration-300"
+                            title="Download CSV"
+                          >
+                            {isCsvLoading ? '...' : '📄 CSV'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
