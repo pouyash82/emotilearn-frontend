@@ -31,6 +31,7 @@ export default function StudentDashboard() {
   const [sessionDuration, setSessionDuration] = useState(0)
   const [showReport, setShowReport] = useState(false)
   const [sessionData, setSessionData] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   // Session tracking
   const emotionHistoryRef = useRef([])
@@ -68,7 +69,11 @@ export default function StudentDashboard() {
   const loadStats = async () => {
     try {
       const res = await API.get('/students/stats')
-      setStats(res.data)
+      setStats({
+        sessions      : res.data.total_sessions   ?? 0,
+        avgEngagement : res.data.avg_engagement   ?? 0,
+        detections    : res.data.total_detections ?? 0,
+      })
     } catch (err) {
       console.log('Stats not available')
     }
@@ -88,12 +93,12 @@ export default function StudentDashboard() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 640, height: 480, facingMode: 'user' }
       })
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
       }
-      
+
       streamRef.current = stream
       setCameraOn(true)
       return true
@@ -105,24 +110,19 @@ export default function StudentDashboard() {
   }
 
   const stopWebcam = useCallback(() => {
-    // Stop all tracks
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => {
         track.stop()
       })
       streamRef.current = null
     }
-    
-    // Clear video element
     if (videoRef.current) {
       videoRef.current.srcObject = null
     }
-    
     setCameraOn(false)
   }, [])
 
   const stopEverything = useCallback(() => {
-    // Clear intervals
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
@@ -131,11 +131,7 @@ export default function StudentDashboard() {
       clearInterval(durationIntervalRef.current)
       durationIntervalRef.current = null
     }
-    
-    // Stop webcam
     stopWebcam()
-    
-    // Reset flags
     isAnalyzingRef.current = false
   }, [stopWebcam])
 
@@ -149,18 +145,17 @@ export default function StudentDashboard() {
     setSessionStartTime(Date.now())
     setSessionDuration(0)
     setIsSessionActive(true)
+    setCurrentEmotion(null)
+    setEmotionScores({})
+    setEngagement(0)
 
-    // Notify backend
     try {
       await API.post('/session/start')
     } catch (err) {
       console.log('Session start notification failed')
     }
 
-    // Start emotion detection loop - 3 seconds between each (for slow server)
     intervalRef.current = setInterval(captureAndAnalyze, 3000)
-    
-    // Capture first frame immediately
     setTimeout(captureAndAnalyze, 500)
   }
 
@@ -171,12 +166,43 @@ export default function StudentDashboard() {
       intervalRef.current = null
     }
 
-    // Prepare session data for report
+    const history = emotionHistoryRef.current
+    const total   = history.length
+
+    // ── Compute aggregates from history ─────────────────────────────────
+    let avgEng       = 0
+    let dominant     = 'neutral'
+    let distribution = {}
+    let uniqueCount  = 0
+
+    if (total > 0) {
+      // Average engagement across the session (already 0-100 in history)
+      const sumEng = history.reduce(
+        (s, h) => s + (h.engagement_score || 0), 0)
+      avgEng = Math.round((sumEng / total) * 10) / 10
+
+      // Most common emotion
+      const counts = {}
+      history.forEach(h => {
+        counts[h.emotion] = (counts[h.emotion] || 0) + 1
+      })
+      dominant = Object.keys(counts).reduce(
+        (a, b) => counts[a] > counts[b] ? a : b)
+
+      // Distribution as percentages
+      Object.entries(counts).forEach(([emo, cnt]) => {
+        distribution[emo] = Math.round((cnt / total) * 1000) / 10
+      })
+
+      uniqueCount = Object.keys(counts).length
+    }
+
+    // ── Prepare local sessionData (for the popup report modal) ──────────
     const finalSessionData = {
-      duration: sessionDuration,
-      totalDetections: detectionCountRef.current,
-      emotionHistory: emotionHistoryRef.current,
-      avgEngagement: engagement
+      duration       : sessionDuration,
+      totalDetections: total,
+      emotionHistory : history,
+      avgEngagement  : avgEng,
     }
     setSessionData(finalSessionData)
 
@@ -184,80 +210,110 @@ export default function StudentDashboard() {
     stopWebcam()
     setIsSessionActive(false)
 
-    // Save session to backend
+    // ══════════════════════════════════════════════════════════════════
+    // Save session to the database so the teacher can see it
+    // ══════════════════════════════════════════════════════════════════
+    if (total > 0) {
+      setSaving(true)
+      try {
+        await API.post('/sessions/save', {
+          lecture_id        : null,
+          avg_engagement    : avgEng,               // 0-100
+          overall_engagement: avgEng,               // 0-100
+          dominant_emotion  : dominant,
+          total_detections  : total,
+          unique_emotions   : uniqueCount,
+          distribution      : distribution,         // 0-100 percentages
+          emotion_logs      : history.map(h => ({
+            time            : h.time || new Date().toISOString(),
+            emotion         : h.emotion,
+            confidence      : (h.confidence || 0) / 100,        // 0-1
+            source          : 'vision',
+            scores          : Object.fromEntries(
+              Object.entries(h.scores || {}).map(
+                ([k, v]) => [k, (v || 0) / 100])),              // 0-1
+            engagement_score: (h.engagement_score || 0) / 100,  // 0-1
+          })),
+        })
+      } catch (err) {
+        console.error('Failed to save session to DB:', err)
+      }
+      setSaving(false)
+    }
+
+    // Keep the legacy /session/end notification for backward compat
     try {
       await API.post('/session/end', {
-        duration: sessionDuration,
-        detections: detectionCountRef.current,
-        avgEngagement: engagement
+        duration     : sessionDuration,
+        detections   : total,
+        avgEngagement: avgEng,
       })
     } catch (err) {
       console.log('Session end notification failed')
     }
 
-    // Show report
+    // Show the popup report
     setShowReport(true)
 
-    // Reload stats
+    // Reload stats and history list
     loadStats()
     loadSessions()
   }
 
   const captureAndAnalyze = async () => {
-    // Prevent overlapping requests
     if (isAnalyzingRef.current || !videoRef.current || !canvasRef.current) {
       return
     }
 
-    const video = videoRef.current
+    const video  = videoRef.current
     const canvas = canvasRef.current
-    
+
     if (video.readyState !== 4) return
 
     isAnalyzingRef.current = true
     setIsProcessing(true)
 
     try {
-      // Capture frame
       const ctx = canvas.getContext('2d')
-      canvas.width = video.videoWidth
+      canvas.width  = video.videoWidth
       canvas.height = video.videoHeight
       ctx.drawImage(video, 0, 0)
-      
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8))
-      
+
+      const blob = await new Promise(resolve =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.8))
+
       const formData = new FormData()
       formData.append('file', blob, 'frame.jpg')
 
-      // Send to backend with timeout
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000) // 15s timeout
+      const timeoutId  = setTimeout(() => controller.abort(), 15000)
 
       const res = await API.post('/api/detect-emotion', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        signal: controller.signal
+        signal : controller.signal,
       })
 
       clearTimeout(timeoutId)
 
       if (res.data) {
         const { dominant, confidence, emotions, engagement: eng } = res.data
-        
+
         setCurrentEmotion(dominant)
         setEmotionScores(emotions || {})
         setEngagement(eng || confidence || 50)
 
-        // Track history
         detectionCountRef.current += 1
         emotionHistoryRef.current.push({
-          timestamp: sessionDuration,
-          emotion: dominant,
-          confidence: confidence || 50,
-          scores: emotions || {}
+          time            : new Date().toISOString(),   // ← absolute time
+          timestamp       : sessionDuration,            // ← kept for the local report
+          emotion         : dominant,
+          confidence      : confidence || 50,           // 0-100
+          scores          : emotions || {},             // 0-100
+          engagement_score: eng || 0,                   // 0-100, converted to 0-1 at save
         })
       }
     } catch (err) {
-      if (err.name === 'AbortError') {
+      if (err.name === 'AbortError' || err.name === 'CanceledError') {
         console.log('Request timed out, will retry')
       } else {
         console.error('Detection error:', err)
@@ -272,6 +328,43 @@ export default function StudentDashboard() {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  /* ════════════════════════════════════════════════════════════════════ */
+  /*  Download the HTML report / CSV for one of the student's past       */
+  /*  sessions. Fetch via axios so the JWT header is included, then turn */
+  /*  the blob into a download / new tab.                                */
+  /* ════════════════════════════════════════════════════════════════════ */
+  const openMyReport = async (sid) => {
+    try {
+      const res = await API.get(
+        `/students/sessions/${sid}/report`,
+        { responseType: 'blob' })
+      const url = URL.createObjectURL(
+        new Blob([res.data], { type: 'text/html' }))
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      alert('Could not load report for this session.')
+    }
+  }
+
+  const downloadMyCSV = async (sid) => {
+    try {
+      const res = await API.get(
+        `/students/sessions/${sid}/csv`,
+        { responseType: 'blob' })
+      const url = URL.createObjectURL(new Blob([res.data]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `my_session_${sid}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('Could not download CSV for this session.')
+    }
   }
 
   return (
@@ -299,10 +392,10 @@ export default function StudentDashboard() {
           {/* Stats */}
           <div className="flex gap-4">
             {[
-              { label: 'Sessions', value: stats.sessions || 0, icon: '📊' },
-              { label: 'Avg Engage', value: `${Math.round(stats.avgEngagement || 0)}%`, icon: '⚡' },
-              { label: 'Detections', value: stats.detections || 0, icon: '🎯' },
-            ].map((stat, i) => (
+              { label: 'Sessions',   value: stats.sessions      || 0,                       icon: '📊' },
+              { label: 'Avg Engage', value: `${Math.round(stats.avgEngagement || 0)}%`,     icon: '⚡' },
+              { label: 'Detections', value: stats.detections    || 0,                       icon: '🎯' },
+            ].map((stat) => (
               <GlassCard key={stat.label} className="px-5 py-4 text-center">
                 <div className="text-2xl mb-1">{stat.icon}</div>
                 <div className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
@@ -317,7 +410,7 @@ export default function StudentDashboard() {
         {/* Tabs */}
         <div className="flex gap-3 mb-6">
           {[
-            { id: 'live', label: '🎥 Live Session' },
+            { id: 'live',    label: '🎥 Live Session' },
             { id: 'history', label: '📚 History' },
           ].map(t => (
             <button
@@ -337,7 +430,7 @@ export default function StudentDashboard() {
         {tab === 'live' && (
           <div className="space-y-6">
             {/* Session Controls */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               {!isSessionActive ? (
                 <button
                   onClick={startSession}
@@ -348,10 +441,18 @@ export default function StudentDashboard() {
               ) : (
                 <button
                   onClick={stopSession}
-                  className="px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 shadow-lg shadow-red-500/30 hover:scale-105 transition-all duration-300 flex items-center gap-2"
+                  disabled={saving}
+                  className="px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 shadow-lg shadow-red-500/30 hover:scale-105 disabled:opacity-60 transition-all duration-300 flex items-center gap-2"
                 >
                   ⏹ Stop Session
                 </button>
+              )}
+
+              {saving && (
+                <div className="flex items-center gap-2 text-amber-400 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                  <div className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                  <span className="text-sm font-medium">Saving session...</span>
+                </div>
               )}
 
               {isSessionActive && (
@@ -360,7 +461,7 @@ export default function StudentDashboard() {
                     <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
                     <span className="text-red-400 font-mono font-bold">{formatDuration(sessionDuration)}</span>
                   </div>
-                  
+
                   {isProcessing && (
                     <div className="flex items-center gap-2 text-blue-400">
                       <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
@@ -383,7 +484,7 @@ export default function StudentDashboard() {
                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                   📹 Face Emotion
                 </h2>
-                
+
                 <div className="relative aspect-video bg-black/50 rounded-2xl overflow-hidden mb-4">
                   <video
                     ref={videoRef}
@@ -393,7 +494,7 @@ export default function StudentDashboard() {
                     className="w-full h-full object-cover"
                   />
                   <canvas ref={canvasRef} className="hidden" />
-                  
+
                   {!cameraOn && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <div className="text-5xl mb-3">📷</div>
@@ -402,7 +503,6 @@ export default function StudentDashboard() {
                     </div>
                   )}
 
-                  {/* Current Emotion Overlay */}
                   {currentEmotion && cameraOn && (
                     <div className="absolute top-4 left-4 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/10">
                       <div className="flex items-center gap-2">
@@ -412,12 +512,11 @@ export default function StudentDashboard() {
                     </div>
                   )}
 
-                  {/* Engagement Overlay */}
                   {isSessionActive && (
                     <div className="absolute top-4 right-4 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/10">
                       <div className="text-center">
-                        <div className="text-xl font-bold" style={{ 
-                          color: engagement >= 60 ? '#22c55e' : engagement >= 40 ? '#eab308' : '#ef4444' 
+                        <div className="text-xl font-bold" style={{
+                          color: engagement >= 60 ? '#22c55e' : engagement >= 40 ? '#eab308' : '#ef4444'
                         }}>
                           {Math.round(engagement)}%
                         </div>
@@ -427,7 +526,6 @@ export default function StudentDashboard() {
                   )}
                 </div>
 
-                {/* Emotion Bars */}
                 {currentEmotion && (
                   <div className="space-y-2">
                     {Object.entries(emotionScores)
@@ -458,7 +556,6 @@ export default function StudentDashboard() {
 
                 {isSessionActive ? (
                   <div className="space-y-6">
-                    {/* Live Stats */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white/5 rounded-xl p-4 text-center">
                         <div className="text-3xl font-bold text-white">{detectionCountRef.current}</div>
@@ -474,7 +571,6 @@ export default function StudentDashboard() {
                       </div>
                     </div>
 
-                    {/* Current Dominant */}
                     {currentEmotion && (
                       <div className="bg-white/5 rounded-xl p-5 text-center">
                         <div className="text-4xl mb-2">{EMOTION_COLORS[currentEmotion]?.emoji}</div>
@@ -483,11 +579,10 @@ export default function StudentDashboard() {
                       </div>
                     )}
 
-                    {/* Tip */}
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
                       <p className="text-blue-300 text-sm">
-                        💡 <strong>Tip:</strong> Analysis runs every 3 seconds. 
-                        Stay still for best results. Click "Stop Session" to see your full report!
+                        💡 <strong>Tip:</strong> Analysis runs every 3 seconds.
+                        Your session will be saved automatically when you stop — your teacher will see it too.
                       </p>
                     </div>
                   </div>
@@ -508,46 +603,84 @@ export default function StudentDashboard() {
 
         {tab === 'history' && (
           <GlassCard className="p-6">
-            <h2 className="text-xl font-bold text-white mb-6">📚 Session History</h2>
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+              <h2 className="text-xl font-bold text-white">📚 Session History</h2>
+              <button
+                onClick={loadSessions}
+                className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-sm hover:bg-white/10 transition-all duration-300"
+              >
+                🔄 Refresh
+              </button>
+            </div>
             {sessions.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-5xl mb-4">📊</div>
                 <p className="text-gray-400">No sessions yet. Start your first session!</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {sessions.map((s, i) => (
-                  <div key={s.id || i} className="bg-white/5 rounded-xl p-4 border border-white/5">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-white font-medium">
-                          Session #{sessions.length - i}
-                        </div>
-                        <div className="text-gray-500 text-sm">
-                          {new Date(s.created_at || s.timestamp).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="flex gap-6">
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-white">{s.duration || 0}s</div>
-                          <div className="text-xs text-gray-500">Duration</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-blue-400">{s.detections || 0}</div>
-                          <div className="text-xs text-gray-500">Detections</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-lg font-bold" style={{
-                            color: (s.avg_engagement || 0) >= 60 ? '#22c55e' : '#eab308'
-                          }}>
-                            {Math.round(s.avg_engagement || 0)}%
+              <div className="space-y-3">
+                {sessions.map((s) => {
+                  const eng = s.avg_engagement || 0
+                  const engC = eng >= 65 ? '#22c55e' : eng >= 40 ? '#eab308' : '#ef4444'
+                  return (
+                    <div
+                      key={s.id}
+                      className="bg-white/5 rounded-xl p-4 border border-white/5 hover:bg-white/10 hover:border-blue-500/30 transition-all duration-300"
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                            #{s.id}
                           </div>
-                          <div className="text-xs text-gray-500">Engagement</div>
+                          <div>
+                            <div className="text-white font-medium">
+                              {s.started_at
+                                ? new Date(s.started_at).toLocaleString()
+                                : 'Unknown date'}
+                            </div>
+                            <div className="text-gray-500 text-sm capitalize">
+                              Dominant: {s.dominant_emotion || 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-6 flex-wrap">
+                          <div className="flex gap-6">
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-blue-400">
+                                {s.total_detections || 0}
+                              </div>
+                              <div className="text-xs text-gray-500">Detections</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-lg font-bold" style={{ color: engC }}>
+                                {Math.round(eng)}%
+                              </div>
+                              <div className="text-xs text-gray-500">Engagement</div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openMyReport(s.id)}
+                              className="px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-medium hover:bg-blue-500/20 transition-all duration-300"
+                              title="Open HTML report in new tab"
+                            >
+                              📊 Report
+                            </button>
+                            <button
+                              onClick={() => downloadMyCSV(s.id)}
+                              className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs font-medium hover:bg-white/10 transition-all duration-300"
+                              title="Download CSV"
+                            >
+                              📄 CSV
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </GlassCard>
