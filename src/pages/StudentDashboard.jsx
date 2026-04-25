@@ -54,6 +54,8 @@ export default function StudentDashboard() {
   const audioStreamRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
+  const captureCountRef = useRef(0)        // tracks cycles for audio timing
+  const allTranscriptsRef = useRef([])     // accumulates all transcriptions
 
   useEffect(() => {
     loadStats()
@@ -109,15 +111,14 @@ export default function StudentDashboard() {
           audio: { echoCancellation: true, noiseSuppression: true }
         })
         audioStreamRef.current = audioStream
-        const recorder = new MediaRecorder(audioStream, {
-          mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-            ? 'audio/webm;codecs=opus' : 'audio/webm'
-        })
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus' : 'audio/webm'
+        const recorder = new MediaRecorder(audioStream, { mimeType })
         audioChunksRef.current = []
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) audioChunksRef.current.push(e.data)
         }
-        recorder.start(1000)
+        recorder.start()  // continuous recording — we stop/restart every ~12s
         mediaRecorderRef.current = recorder
         setMicOn(true)
       } catch (micErr) {
@@ -173,6 +174,8 @@ export default function StudentDashboard() {
     setTranscription('')
     setTextEmotion(null)
     setModalities({ face: false, audio: false })
+    captureCountRef.current = 0
+    allTranscriptsRef.current = []
     try { await API.post('/session/start') } catch {}
     intervalRef.current = setInterval(captureAndAnalyze, 3000)
     setTimeout(captureAndAnalyze, 500)
@@ -222,7 +225,11 @@ export default function StudentDashboard() {
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // Multimodal capture: webcam frame + mic audio → /api/multimodal-detect
+  // Dual-cycle capture:
+  //   • Every 3s: face frame → /api/detect-emotion (fast, local)
+  //   • Every 4th cycle (~12s): stop recorder → grab full audio clip
+  //     → send face+audio to /api/multimodal-detect → restart recorder
+  // This gives Whisper a proper 12s clip instead of choppy 3s fragments.
   // ══════════════════════════════════════════════════════════════════════
   const captureAndAnalyze = async () => {
     if (isAnalyzingRef.current || !videoRef.current || !canvasRef.current) return
@@ -231,52 +238,112 @@ export default function StudentDashboard() {
     if (video.readyState !== 4) return
     isAnalyzingRef.current = true
     setIsProcessing(true)
+
+    captureCountRef.current += 1
+    const isAudioCycle = micOn && captureCountRef.current % 4 === 0
+
     try {
+      // ── Capture video frame (every cycle) ─────────────────────────
       const ctx = canvas.getContext('2d')
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
       ctx.drawImage(video, 0, 0)
       const imageBlob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8))
-      const formData = new FormData()
-      formData.append('image', imageBlob, 'frame.jpg')
 
-      // Grab accumulated audio chunks
-      const chunks = audioChunksRef.current
-      audioChunksRef.current = []
-      if (chunks.length > 0) {
-        const audioBlob = new Blob(chunks, { type: 'audio/webm' })
-        if (audioBlob.size > 1000) formData.append('audio', audioBlob, 'audio.webm')
-      }
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 20000)
-      const res = await API.post('/api/multimodal-detect', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        signal: controller.signal,
-      })
-      clearTimeout(timeoutId)
-
-      if (res.data) {
-        const d = res.data
-        const result = d.fused || d.face || {}
-        const dom = result.dominant || result.emotion || 'neutral'
-        const scores = result.scores || {}
-        const conf = result.confidence || 0
-        const eng = result.engagement || 0
-        const displayScores = {}
-        Object.entries(scores).forEach(([k, v]) => { displayScores[k] = v > 1 ? v : Math.round(v * 100) })
-        setCurrentEmotion(dom)
-        setEmotionScores(displayScores)
-        setEngagement(eng || conf * 100 || 50)
-        if (d.transcription) setTranscription(d.transcription)
-        if (d.text_emotion && d.text_emotion.success) setTextEmotion(d.text_emotion)
-        if (d.modalities_used) setModalities(d.modalities_used)
-        detectionCountRef.current += 1
-        emotionHistoryRef.current.push({
-          time: new Date().toISOString(), timestamp: sessionDuration, emotion: dom,
-          confidence: conf > 1 ? conf : conf * 100, scores: displayScores,
-          engagement_score: eng || 0, source: d.modalities_used?.audio ? 'multimodal' : 'vision',
+      if (isAudioCycle && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        // ── AUDIO CYCLE: stop recorder → get complete blob → send multimodal ──
+        const audioBlob = await new Promise((resolve) => {
+          const recorder = mediaRecorderRef.current
+          recorder.onstop = () => {
+            const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+            audioChunksRef.current = []
+            resolve(blob)
+          }
+          recorder.stop()
         })
+
+        // Restart recorder immediately for next cycle
+        if (audioStreamRef.current) {
+          const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus' : 'audio/webm'
+          const newRecorder = new MediaRecorder(audioStreamRef.current, { mimeType })
+          newRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunksRef.current.push(e.data)
+          }
+          newRecorder.start()
+          mediaRecorderRef.current = newRecorder
+        }
+
+        // Send face + audio to multimodal endpoint
+        const formData = new FormData()
+        formData.append('image', imageBlob, 'frame.jpg')
+        if (audioBlob.size > 1000) {
+          formData.append('audio', audioBlob, 'audio.webm')
+        }
+
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 25000)
+        const res = await API.post('/api/multimodal-detect', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+
+        if (res.data) {
+          const d = res.data
+          const result = d.fused || d.face || {}
+          const dom = result.dominant || result.emotion || 'neutral'
+          const scores = result.scores || {}
+          const conf = result.confidence || 0
+          const eng = result.engagement || 0
+          const displayScores = {}
+          Object.entries(scores).forEach(([k, v]) => { displayScores[k] = v > 1 ? v : Math.round(v * 100) })
+          setCurrentEmotion(dom)
+          setEmotionScores(displayScores)
+          setEngagement(eng || conf * 100 || 50)
+
+          // Accumulate transcription
+          if (d.transcription && d.transcription.trim()) {
+            allTranscriptsRef.current.push(d.transcription.trim())
+            setTranscription(allTranscriptsRef.current.join(' '))
+          }
+          if (d.text_emotion && d.text_emotion.success) setTextEmotion(d.text_emotion)
+          if (d.modalities_used) setModalities(d.modalities_used)
+
+          detectionCountRef.current += 1
+          emotionHistoryRef.current.push({
+            time: new Date().toISOString(), timestamp: sessionDuration, emotion: dom,
+            confidence: conf > 1 ? conf : conf * 100, scores: displayScores,
+            engagement_score: eng || 0, source: 'multimodal',
+          })
+        }
+      } else {
+        // ── FACE-ONLY CYCLE: fast detection, no audio ───────────────
+        const formData = new FormData()
+        formData.append('file', imageBlob, 'frame.jpg')
+
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000)
+        const res = await API.post('/api/detect-emotion', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+
+        if (res.data) {
+          const { dominant, confidence, emotions, engagement: eng } = res.data
+          setCurrentEmotion(dominant)
+          setEmotionScores(emotions || {})
+          setEngagement(eng || confidence || 50)
+          setModalities(prev => ({ ...prev, face: true }))
+
+          detectionCountRef.current += 1
+          emotionHistoryRef.current.push({
+            time: new Date().toISOString(), timestamp: sessionDuration, emotion: dominant,
+            confidence: confidence || 50, scores: emotions || {},
+            engagement_score: eng || 0, source: 'vision',
+          })
+        }
       }
     } catch (err) {
       if (err.name === 'AbortError' || err.name === 'CanceledError') console.log('Request timed out')
@@ -481,19 +548,24 @@ export default function StudentDashboard() {
                       </div>
                     )}
 
-                    {/* Transcription bubble */}
+                    {/* Transcription bubble — shows accumulated speech */}
                     {transcription && (
                       <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-sm">🎤</span>
-                          <span className="text-purple-400 text-xs font-bold uppercase">Speech Detected</span>
+                          <span className="text-purple-400 text-xs font-bold uppercase">Speech Transcript</span>
                           {textEmotion && (
                             <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 capitalize">
                               {textEmotion.emotion}
                             </span>
                           )}
                         </div>
-                        <p className="text-gray-300 text-sm italic">"{transcription}"</p>
+                        <div className="max-h-24 overflow-y-auto">
+                          <p className="text-gray-300 text-sm leading-relaxed">{transcription}</p>
+                        </div>
+                        <div className="text-right mt-1">
+                          <span className="text-gray-600 text-xs">{allTranscriptsRef.current.length} segments captured</span>
+                        </div>
                       </div>
                     )}
 
