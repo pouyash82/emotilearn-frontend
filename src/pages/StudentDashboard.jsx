@@ -38,6 +38,7 @@ export default function StudentDashboard() {
   const [transcription, setTranscription] = useState('')
   const [textEmotion, setTextEmotion] = useState(null)
   const [transcribing, setTranscribing] = useState(false)
+  const [voiceEmotion, setVoiceEmotion] = useState(null)
 
   // Session tracking
   const emotionHistoryRef = useRef([])
@@ -56,6 +57,7 @@ export default function StudentDashboard() {
   const audioChunksRef = useRef([])
   const audioIntervalRef = useRef(null)
   const allTranscriptsRef = useRef([])
+  const allAudioBlobsRef = useRef([])     // saves all audio for final voice emotion
   const transcriptBoxRef = useRef(null)
 
   useEffect(() => {
@@ -185,6 +187,7 @@ export default function StudentDashboard() {
 
     // Send to Whisper if there's meaningful audio
     if (audioBlob.size < 1000) return
+    allAudioBlobsRef.current.push(audioBlob)  // save for voice emotion at end
     try {
       const form = new FormData()
       form.append('file', audioBlob, 'chunk.webm')
@@ -231,6 +234,7 @@ export default function StudentDashboard() {
     setTextEmotion(null)
     setTranscribing(false)
     allTranscriptsRef.current = []
+    allAudioBlobsRef.current = []
     try { await API.post('/session/start') } catch {}
     intervalRef.current = setInterval(captureAndAnalyze, 3000)
     setTimeout(captureAndAnalyze, 500)
@@ -262,6 +266,7 @@ export default function StudentDashboard() {
       })
 
       if (finalBlob.size > 1000) {
+        allAudioBlobsRef.current.push(finalBlob)  // save final chunk too
         try {
           const form = new FormData()
           form.append('file', finalBlob, 'final_chunk.webm')
@@ -295,6 +300,23 @@ export default function StudentDashboard() {
         }
       } catch (err) { console.log('Text emotion failed:', err.message) }
     }
+
+    // ── Run wav2vec2 voice tone emotion on combined session audio ─────
+    if (allAudioBlobsRef.current.length > 0) {
+      try {
+        const combinedAudio = new Blob(allAudioBlobsRef.current, { type: 'audio/webm' })
+        const voiceForm = new FormData()
+        voiceForm.append('file', combinedAudio, 'session_voice.webm')
+        const voiceRes = await API.post('/api/voice-emotion', voiceForm, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 60000,
+        })
+        if (voiceRes.data && voiceRes.data.success) {
+          setVoiceEmotion(voiceRes.data)
+        }
+      } catch (err) { console.log('Voice emotion failed:', err.message) }
+    }
+
     setTranscribing(false)
 
     setIsSessionActive(false)
@@ -320,6 +342,7 @@ export default function StudentDashboard() {
       emotionHistory: history, avgEngagement: avgEng,
       transcription: allTranscriptsRef.current.join(' '),
       textEmotion: textEmotion,
+      voiceEmotion: voiceEmotion,
     }
     setSessionData(finalSessionData)
 
@@ -625,25 +648,62 @@ export default function StudentDashboard() {
                         <div className="flex items-center gap-2 mb-3">
                           <span className="text-lg">🎤</span>
                           <span className="text-purple-400 text-sm font-bold uppercase">Full Session Transcript</span>
-                          {textEmotion && (
-                            <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 capitalize">
-                              Text emotion: {textEmotion.emotion} ({Math.round((textEmotion.confidence || 0) * 100)}%)
-                            </span>
-                          )}
                         </div>
                         <div className="max-h-40 overflow-y-auto bg-black/20 rounded-lg p-3">
                           <p className="text-gray-300 text-sm leading-relaxed">{transcription}</p>
                         </div>
-                        {textEmotion && textEmotion.scores && (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {Object.entries(textEmotion.scores)
-                              .sort((a, b) => b[1] - a[1])
-                              .slice(0, 4)
-                              .map(([emo, score]) => (
-                                <span key={emo} className="text-xs px-2 py-1 rounded-lg bg-white/5 text-gray-400 capitalize">
-                                  {EMOTION_COLORS[emo]?.emoji || '•'} {emo}: {Math.round(score * 100)}%
-                                </span>
-                              ))}
+
+                        {/* ── Tri-signal emotion summary ──────────────── */}
+                        <div className="mt-3 space-y-2">
+                          {textEmotion && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-400 flex items-center gap-1.5">
+                                <span>📝</span> Text Emotion (what you said)
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 capitalize text-xs font-bold">
+                                {textEmotion.emotion} ({Math.round((textEmotion.confidence || 0) * 100)}%)
+                              </span>
+                            </div>
+                          )}
+                          {voiceEmotion && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-400 flex items-center gap-1.5">
+                                <span>🔊</span> Voice Emotion (how you sounded)
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 capitalize text-xs font-bold">
+                                {voiceEmotion.emotion} ({Math.round((voiceEmotion.confidence || 0) * 100)}%)
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Per-emotion breakdown from all signals */}
+                        {(textEmotion?.scores || voiceEmotion?.scores) && (
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            {textEmotion?.scores && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">📝 Text scores</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {Object.entries(textEmotion.scores).sort((a,b) => b[1]-a[1]).slice(0,4).map(([e,s]) => (
+                                    <span key={e} className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-gray-400 capitalize">
+                                      {EMOTION_COLORS[e]?.emoji||'•'} {e}: {Math.round(s*100)}%
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {voiceEmotion?.scores && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">🔊 Voice scores</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {Object.entries(voiceEmotion.scores).sort((a,b) => b[1]-a[1]).slice(0,4).map(([e,s]) => (
+                                    <span key={e} className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-gray-400 capitalize">
+                                      {EMOTION_COLORS[e]?.emoji||'•'} {e}: {Math.round(s*100)}%
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
