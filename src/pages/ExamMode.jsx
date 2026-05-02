@@ -97,25 +97,40 @@ export default function ExamMode() {
   }, [])
 
   const startExam = async () => {
-    const ok = await startWebcam()
-    if (!ok) return
     try {
       const res = await API.post('/api/exam/start', { exam_id: '', student_id: 0 })
       const id = res.data?.exam_id || `exam_${Date.now()}`
       setExamId(id)
       examIdRef.current = id
-    } catch { setExamId(`exam_${Date.now()}`); examIdRef.current = examId }
+    } catch { const id = `exam_${Date.now()}`; setExamId(id); examIdRef.current = id }
     startTimeRef.current = Date.now()
     setDuration(0)
-    setExamActive(true)
+    setExamActive(true)  // renders the video element first
     setReport(null)
     setDetectionCount(0)
     setInteractionCount(0)
     setWarnings([])
     setFocusScore(100)
-    intervalRef.current = setInterval(captureFrame, 3000)
-    setTimeout(captureFrame, 500)
+    // Camera starts via useEffect below after video element mounts
   }
+
+  // Start camera once examActive is true and video element exists
+  useEffect(() => {
+    if (!examActive) return
+    let cancelled = false
+    const initCamera = async () => {
+      // Small delay to let React render the video element
+      await new Promise(r => setTimeout(r, 100))
+      if (cancelled) return
+      const ok = await startWebcam()
+      if (ok && !cancelled) {
+        intervalRef.current = setInterval(captureFrame, 3000)
+        setTimeout(captureFrame, 500)
+      }
+    }
+    initCamera()
+    return () => { cancelled = true }
+  }, [examActive])
 
   const endExam = async () => {
     clearInterval(intervalRef.current)
