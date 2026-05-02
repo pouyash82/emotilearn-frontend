@@ -145,6 +145,30 @@ export default function ExamMode() {
     setGenerating(false)
   }
 
+  // Classify which screen region the face is looking at based on bbox position
+  const classifyGaze = (bbox, frameW, frameH) => {
+    if (!bbox) return 'absent'
+    const [x, y, w, h] = bbox
+    const cx = (x + w / 2) / frameW   // 0-1 normalized
+    const cy = (y + h / 2) / frameH
+    const tol = 0.25
+
+    if (cx >= 0.5 - tol && cx <= 0.5 + tol && cy >= 0.5 - tol && cy <= 0.5 + tol) return 'center'
+    if (cy < 0.35) {
+      if (cx < 0.35) return 'top_left'
+      if (cx > 0.65) return 'top_right'
+      return 'top'
+    }
+    if (cy > 0.65) {
+      if (cx < 0.35) return 'bottom_left'
+      if (cx > 0.65) return 'bottom_right'
+      return 'bottom'
+    }
+    if (cx < 0.35) return 'left'
+    if (cx > 0.65) return 'right'
+    return 'center'
+  }
+
   const captureFrame = async () => {
     if (isAnalyzingRef.current || !videoRef.current || !canvasRef.current) return
     const video = videoRef.current
@@ -164,7 +188,8 @@ export default function ExamMode() {
 
       const controller = new AbortController()
       const tid = setTimeout(() => controller.abort(), 15000)
-      const res = await API.post('/api/detect-emotion', formData, {
+      // Use exam-specific endpoint with head + eye gaze tracking
+      const res = await API.post('/api/exam/detect-with-gaze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         signal: controller.signal,
       })
@@ -175,47 +200,84 @@ export default function ExamMode() {
       let bbox = null
       let emotion = 'neutral'
       let engScore = 0
+      const frameW = video.videoWidth || 640
+      const frameH = video.videoHeight || 480
 
-      if (res.data && res.data.dominant) {
+      if (res.data && res.data.success) {
         faceDetected = true
-        emotion = res.data.dominant
-        engScore = res.data.engagement || res.data.confidence || 50
+        emotion = res.data.emotion?.emotion || 'neutral'
+        engScore = res.data.emotion?.engagement || 50
+        bbox = res.data.head_position?.bbox || null
         setCurrentEmotion(emotion)
-        // Estimate bbox from the response (face was detected)
-        bbox = [160, 120, 320, 320] // approximate center — real bbox would come from multi endpoint
+
+        const attention = res.data.attention || {}
+        const headOk = attention.head_ok
+        const eyesOk = attention.eyes_ok
+        const attentionStatus = attention.status || 'distracted'
+        const eyeDir = res.data.eye_gaze?.direction || 'away'
+
+        // Determine region from combined head + eyes
+        if (attentionStatus === 'fully_focused') {
+          setCurrentRegion('center')
+        } else if (attentionStatus === 'eyes_wandering') {
+          setCurrentRegion(eyeDir === 'left' ? 'left' : eyeDir === 'right' ? 'right' : eyeDir === 'down' ? 'bottom' : eyeDir === 'up' ? 'top' : 'center')
+          setFocusScore(s => Math.max(0, s - 2))
+          setWarnings(w => {
+            const nw = [...w, { time: ts, type: `Eyes looking ${eyeDir}` }]
+            return nw.length > 20 ? nw.slice(-20) : nw
+          })
+        } else if (attentionStatus === 'head_turned') {
+          const headDir = res.data.head_position?.region || 'away'
+          setCurrentRegion(headDir)
+          setFocusScore(s => Math.max(0, s - 2.5))
+          setWarnings(w => {
+            const nw = [...w, { time: ts, type: `Head turned ${headDir}` }]
+            return nw.length > 20 ? nw.slice(-20) : nw
+          })
+        } else if (attentionStatus === 'eyes_closed_or_hidden') {
+          setCurrentRegion('absent')
+          setFocusScore(s => Math.max(0, s - 1.5))
+          setWarnings(w => {
+            const nw = [...w, { time: ts, type: 'Eyes not visible' }]
+            return nw.length > 20 ? nw.slice(-20) : nw
+          })
+        } else if (attentionStatus === 'distracted') {
+          setCurrentRegion(res.data.head_position?.region || 'away')
+          setFocusScore(s => Math.max(0, s - 3))
+          setWarnings(w => {
+            const nw = [...w, { time: ts, type: `Distracted: head ${res.data.head_position?.region}, eyes ${eyeDir}` }]
+            return nw.length > 20 ? nw.slice(-20) : nw
+          })
+        }
       } else {
+        // No face detected at all
+        faceDetected = false
         setCurrentEmotion(null)
-      }
-
-      // Classify gaze region based on face position
-      if (!faceDetected) {
         setCurrentRegion('absent')
-        const newWarnings = [...warnings]
-        newWarnings.push({ time: ts, type: 'Face not detected' })
-        if (newWarnings.length > 20) newWarnings.shift()
-        setWarnings(newWarnings)
-      } else {
-        setCurrentRegion('center') // simplified — real gaze needs bbox position
+        setFocusScore(s => Math.max(0, s - 3))
+        setWarnings(w => {
+          const nw = [...w, { time: ts, type: 'Face not detected' }]
+          return nw.length > 20 ? nw.slice(-20) : nw
+        })
       }
 
-      // Send detection to exam session
+      // Send detection to exam session backend
       await API.post('/api/exam/detection', {
         exam_id: examIdRef.current,
         timestamp: ts,
-        bbox, face_detected: faceDetected,
-        emotion, engagement_score: engScore,
-        frame_size: [video.videoWidth, video.videoHeight],
+        bbox,
+        face_detected: faceDetected,
+        emotion,
+        engagement_score: engScore,
+        frame_size: [frameW, frameH],
       }).catch(() => {})
 
       setDetectionCount(c => c + 1)
 
-      // Check interaction gap
+      // Check interaction gap — no typing for 30+ seconds
       const gapSec = (Date.now() - lastInteractionRef.current) / 1000
       if (gapSec > 30) {
-        setFocusScore(s => Math.max(0, s - 2))
-      }
-      if (!faceDetected) {
-        setFocusScore(s => Math.max(0, s - 3))
+        setFocusScore(s => Math.max(0, s - 1))
       }
     } catch (err) {
       if (err.name !== 'AbortError') console.error('Exam frame error:', err)
