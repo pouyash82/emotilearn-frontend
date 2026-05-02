@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar'
 import GlassCard from '../components/GlassCard'
 import TypingText from '../components/TypingText'
 import LiveClass from './LiveClass'
+import LectureAnalytics from './LectureAnalytics'
 import API from '../api'
 
 const EMOTION_COLORS = {
@@ -156,6 +157,7 @@ export default function TeacherDashboard() {
             { id: 'live',     label: '🎥 Live Class' },
             { id: 'courses',  label: '📚 Courses' },
             { id: 'students', label: '🎓 Students' },
+            { id: 'lecture',  label: '🎬 Lecture Analytics' },
           ].map(t => (
             <button
               key={t.id}
@@ -436,6 +438,9 @@ export default function TeacherDashboard() {
             )}
           </GlassCard>
         )}
+
+        {/* ═════════ LECTURE ANALYTICS TAB ═════════ */}
+        {tab === 'lecture' && <LectureAnalytics />}
       </div>
 
       {/* ═════════ STUDENT ANALYTICS MODAL ═════════ */}

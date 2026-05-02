@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar'
 import GlassCard from '../components/GlassCard'
 import TypingText from '../components/TypingText'
 import SessionReport from '../components/SessionReport'
+import ExamMode from './ExamMode'
 import API from '../api'
 
 const EMOTION_COLORS = {
@@ -467,7 +468,7 @@ export default function StudentDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-3 mb-6">
-          {[{ id: 'live', label: '🎥 Live Session' }, { id: 'history', label: '📚 History' }].map(t => (
+          {[{ id: 'live', label: '🎥 Live Session' }, { id: 'history', label: '📚 History' }, { id: 'exam', label: '🔒 Exam Mode' }].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-6 py-3 rounded-2xl font-medium transition-all duration-300 ${tab === t.id ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg' : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'}`}>
               {t.label}
@@ -773,6 +774,8 @@ export default function StudentDashboard() {
             )}
           </GlassCard>
         )}
+
+        {tab === 'exam' && <ExamMode />}
       </div>
       {showReport && sessionData && <SessionReport sessionData={sessionData} onClose={() => setShowReport(false)} />}
     </div>
