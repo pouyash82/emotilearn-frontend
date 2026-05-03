@@ -31,6 +31,8 @@ export default function ExamMode() {
   const [detectionCount, setDetectionCount] = useState(0)
   const [interactionCount, setInteractionCount] = useState(0)
   const [warnings, setWarnings] = useState([])
+  const [faceDistance, setFaceDistance] = useState(null)
+  const [distanceStatus, setDistanceStatus] = useState('normal')
 
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -212,6 +214,12 @@ export default function ExamMode() {
         bbox = res.data.head_position?.bbox || null
         setCurrentEmotion(emotion)
 
+        // Update face distance
+        if (res.data.face_distance) {
+          setFaceDistance(`${res.data.face_distance.cm}cm`)
+          setDistanceStatus(res.data.face_distance.status || 'normal')
+        }
+
         const attention = res.data.attention || {}
         const attentionStatus = attention.status || 'distracted'
         const eyeDir = res.data.eye_gaze?.direction || 'away'
@@ -229,6 +237,13 @@ export default function ExamMode() {
           setCurrentRegion('center')
           // Slowly recover score when focused
           setFocusScore(s => Math.min(100, s + 0.5))
+        } else if (attentionStatus === 'wrong_distance' && isConsistentlyOff) {
+          setCurrentRegion('center')
+          setFocusScore(s => Math.max(0, s - 1))
+          setWarnings(w => {
+            const nw = [...w, { time: ts, type: `Wrong distance: ${res.data.face_distance?.cm || '?'}cm` }]
+            return nw.length > 20 ? nw.slice(-20) : nw
+          })
         } else if (isConsistentlyOff) {
           // Only penalize after consistent off-center readings
           if (attentionStatus === 'eyes_wandering') {
@@ -396,6 +411,17 @@ export default function ExamMode() {
                 <div className="flex justify-between"><span className="text-gray-400">Interactions</span><span className="text-white font-bold">{interactionCount}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Duration</span><span className="text-white font-bold">{fmt(duration)}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Gaze</span><span className="font-bold" style={{ color: currentRegion === 'center' ? '#22c55e' : '#ef4444' }}>{currentRegion}</span></div>
+              </div>
+            </GlassCard>
+
+            {/* Face distance indicator */}
+            <GlassCard className="p-5">
+              <h3 className="text-sm font-bold text-gray-400 uppercase mb-3">📏 Distance</h3>
+              <div className="text-center">
+                <div className="text-2xl font-black text-white">{faceDistance || '—'}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {distanceStatus === 'normal' ? '✅ Good (30-45cm)' : distanceStatus === 'too_close' ? '⚠️ Too close' : distanceStatus === 'too_far' ? '⚠️ Too far' : 'Measuring...'}
+                </div>
               </div>
             </GlassCard>
 
