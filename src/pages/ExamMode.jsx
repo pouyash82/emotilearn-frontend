@@ -218,12 +218,12 @@ export default function ExamMode() {
 
         // Push to buffer for smoothing
         gazeBufferRef.current.push(attentionStatus)
-        if (gazeBufferRef.current.length > 4) gazeBufferRef.current.shift()
+        if (gazeBufferRef.current.length > 3) gazeBufferRef.current.shift()
 
-        // Only react if 3 out of last 4 readings agree (noise filtering)
+        // React if 2 out of last 3 readings agree (fast but filtered)
         const recent = gazeBufferRef.current
         const offCenterCount = recent.filter(s => s !== 'fully_focused').length
-        const isConsistentlyOff = offCenterCount >= 3
+        const isConsistentlyOff = offCenterCount >= 2
 
         if (attentionStatus === 'fully_focused') {
           setCurrentRegion('center')
@@ -268,9 +268,9 @@ export default function ExamMode() {
         faceDetected = false
         setCurrentEmotion(null)
         gazeBufferRef.current.push('absent')
-        if (gazeBufferRef.current.length > 4) gazeBufferRef.current.shift()
+        if (gazeBufferRef.current.length > 3) gazeBufferRef.current.shift()
         const absentCount = gazeBufferRef.current.filter(s => s === 'absent').length
-        if (absentCount >= 3) {
+        if (absentCount >= 2) {
           setCurrentRegion('absent')
           setFocusScore(s => Math.max(0, s - 3))
           setWarnings(w => {
