@@ -41,6 +41,7 @@ export default function ExamMode() {
   const isAnalyzingRef = useRef(false)
   const examIdRef = useRef('')
   const lastInteractionRef = useRef(Date.now())
+  const gazeBufferRef = useRef([])  // last N gaze readings for smoothing
 
   useEffect(() => () => stopEverything(), [])
 
@@ -111,6 +112,7 @@ export default function ExamMode() {
     setInteractionCount(0)
     setWarnings([])
     setFocusScore(100)
+    gazeBufferRef.current = []
     // Camera starts via useEffect below after video element mounts
   }
 
@@ -211,54 +213,71 @@ export default function ExamMode() {
         setCurrentEmotion(emotion)
 
         const attention = res.data.attention || {}
-        const headOk = attention.head_ok
-        const eyesOk = attention.eyes_ok
         const attentionStatus = attention.status || 'distracted'
         const eyeDir = res.data.eye_gaze?.direction || 'away'
 
-        // Determine region from combined head + eyes
+        // Push to buffer for smoothing
+        gazeBufferRef.current.push(attentionStatus)
+        if (gazeBufferRef.current.length > 4) gazeBufferRef.current.shift()
+
+        // Only react if 3 out of last 4 readings agree (noise filtering)
+        const recent = gazeBufferRef.current
+        const offCenterCount = recent.filter(s => s !== 'fully_focused').length
+        const isConsistentlyOff = offCenterCount >= 3
+
         if (attentionStatus === 'fully_focused') {
           setCurrentRegion('center')
-        } else if (attentionStatus === 'eyes_wandering') {
-          setCurrentRegion(eyeDir === 'left' ? 'left' : eyeDir === 'right' ? 'right' : eyeDir === 'down' ? 'bottom' : eyeDir === 'up' ? 'top' : 'center')
-          setFocusScore(s => Math.max(0, s - 2))
-          setWarnings(w => {
-            const nw = [...w, { time: ts, type: `Eyes looking ${eyeDir}` }]
-            return nw.length > 20 ? nw.slice(-20) : nw
-          })
-        } else if (attentionStatus === 'head_turned') {
-          const headDir = res.data.head_position?.region || 'away'
-          setCurrentRegion(headDir)
-          setFocusScore(s => Math.max(0, s - 2.5))
-          setWarnings(w => {
-            const nw = [...w, { time: ts, type: `Head turned ${headDir}` }]
-            return nw.length > 20 ? nw.slice(-20) : nw
-          })
-        } else if (attentionStatus === 'eyes_closed_or_hidden') {
+          // Slowly recover score when focused
+          setFocusScore(s => Math.min(100, s + 0.5))
+        } else if (isConsistentlyOff) {
+          // Only penalize after consistent off-center readings
+          if (attentionStatus === 'eyes_wandering') {
+            setCurrentRegion(eyeDir === 'left' ? 'left' : eyeDir === 'right' ? 'right' : eyeDir === 'down' ? 'bottom' : eyeDir === 'up' ? 'top' : 'center')
+            setFocusScore(s => Math.max(0, s - 2))
+            setWarnings(w => {
+              const nw = [...w, { time: ts, type: `Eyes looking ${eyeDir}` }]
+              return nw.length > 20 ? nw.slice(-20) : nw
+            })
+          } else if (attentionStatus === 'head_turned') {
+            const headDir = res.data.head_position?.region || 'away'
+            setCurrentRegion(headDir)
+            setFocusScore(s => Math.max(0, s - 2.5))
+            setWarnings(w => {
+              const nw = [...w, { time: ts, type: `Head turned ${headDir}` }]
+              return nw.length > 20 ? nw.slice(-20) : nw
+            })
+          } else if (attentionStatus === 'eyes_closed_or_hidden') {
+            setCurrentRegion('absent')
+            setFocusScore(s => Math.max(0, s - 1.5))
+            setWarnings(w => {
+              const nw = [...w, { time: ts, type: 'Eyes not visible' }]
+              return nw.length > 20 ? nw.slice(-20) : nw
+            })
+          } else if (attentionStatus === 'distracted') {
+            setCurrentRegion(res.data.head_position?.region || 'away')
+            setFocusScore(s => Math.max(0, s - 3))
+            setWarnings(w => {
+              const nw = [...w, { time: ts, type: `Distracted` }]
+              return nw.length > 20 ? nw.slice(-20) : nw
+            })
+          }
+        }
+        // If not consistently off, keep current region but don't penalize (noise)
+      } else {
+        // No face detected
+        faceDetected = false
+        setCurrentEmotion(null)
+        gazeBufferRef.current.push('absent')
+        if (gazeBufferRef.current.length > 4) gazeBufferRef.current.shift()
+        const absentCount = gazeBufferRef.current.filter(s => s === 'absent').length
+        if (absentCount >= 3) {
           setCurrentRegion('absent')
-          setFocusScore(s => Math.max(0, s - 1.5))
-          setWarnings(w => {
-            const nw = [...w, { time: ts, type: 'Eyes not visible' }]
-            return nw.length > 20 ? nw.slice(-20) : nw
-          })
-        } else if (attentionStatus === 'distracted') {
-          setCurrentRegion(res.data.head_position?.region || 'away')
           setFocusScore(s => Math.max(0, s - 3))
           setWarnings(w => {
-            const nw = [...w, { time: ts, type: `Distracted: head ${res.data.head_position?.region}, eyes ${eyeDir}` }]
+            const nw = [...w, { time: ts, type: 'Face not detected' }]
             return nw.length > 20 ? nw.slice(-20) : nw
           })
         }
-      } else {
-        // No face detected at all
-        faceDetected = false
-        setCurrentEmotion(null)
-        setCurrentRegion('absent')
-        setFocusScore(s => Math.max(0, s - 3))
-        setWarnings(w => {
-          const nw = [...w, { time: ts, type: 'Face not detected' }]
-          return nw.length > 20 ? nw.slice(-20) : nw
-        })
       }
 
       // Send detection to exam session backend
