@@ -5,6 +5,7 @@ import Register         from './pages/Register'
 import StudentDashboard from './pages/StudentDashboard'
 import TeacherDashboard from './pages/TeacherDashboard'
 import ProtectedRoute   from './components/ProtectedRoute'
+import ExamPage from './pages/ExamPage'
 
 function HomeRedirect() {
   const { user, loading } = useAuth()
@@ -20,6 +21,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/exam" element={<ExamPage />} />
           <Route path="/"         element={<HomeRedirect />} />
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
