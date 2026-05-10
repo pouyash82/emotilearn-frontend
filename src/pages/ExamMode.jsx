@@ -133,27 +133,66 @@ export default function ExamMode() {
 
         if (bbox.length === 4) {
           const [bx, by, bw, bh] = bbox
-          if (!baselineFaceRef.current && bw > 30) baselineFaceRef.current = bw
-          const dist = Math.round(((baselineFaceRef.current || 300) * 35) / Math.max(1, bw))
+
+          // Calibrate baseline on first good detection
+          if (!baselineFaceRef.current && bw > 30) baselineFaceRef.current = { w: bw, cx: (bx + bw/2) / frameW }
+
+          const baseline = baselineFaceRef.current || { w: bw, cx: 0.5 }
+          const dist = Math.round((baseline.w * 35) / Math.max(1, bw))
           setFaceDistance(`${dist}cm`)
 
-          const cx = (bx + bw / 2) / frameW, cy = (by + bh / 2) / frameH
-          let region = 'center'
-          if (cx < 0.22) region = 'left'
-          else if (cx > 0.78) region = 'right'
-          else if (cy < 0.22) region = 'top'
-          else if (cy > 0.78) region = 'bottom'
+          // ── PRIMARY SIGNAL: face width ratio ──────────────────
+          // When head turns, face gets NARROWER (you see it from the side)
+          // ratio ~1.0 = facing camera, ~0.7 = turned ~30°, <0.6 = turned significantly
+          const widthRatio = bw / Math.max(1, baseline.w)
 
+          // ── SECONDARY SIGNAL: position shift from baseline ────
+          // Even small shifts matter at laptop distance
+          const cx = (bx + bw / 2) / frameW
+          const cy = (by + bh / 2) / frameH
+          const shiftX = Math.abs(cx - baseline.cx)
+          const shiftY = Math.abs(cy - 0.5)
+
+          // ── Classify attention ────────────────────────────────
+          let region = 'center'
+          let penalty = 0
+
+          if (widthRatio < 0.6) {
+            // Face very narrow — head significantly turned
+            region = cx < 0.5 ? 'left' : 'right'
+            penalty = 3
+          } else if (widthRatio < 0.8) {
+            // Face somewhat narrow — head partially turned
+            region = cx < 0.5 ? 'left' : 'right'
+            penalty = 1.5
+          } else if (shiftX > 0.12) {
+            // Face normal width but shifted position
+            region = cx < baseline.cx ? 'left' : 'right'
+            penalty = 1
+          } else if (shiftY > 0.15) {
+            region = cy < 0.5 ? 'top' : 'bottom'
+            penalty = 1
+          }
+
+          // Buffer smoothing (2 out of 3)
           gazeBufferRef.current.push(region)
           if (gazeBufferRef.current.length > 3) gazeBufferRef.current.shift()
           const offCount = gazeBufferRef.current.filter(r => r !== 'center').length
 
           if (region === 'center') {
-            setCurrentRegion('center'); setFocusScore(s => Math.min(100, s + 0.5))
+            setCurrentRegion('center')
+            setFocusScore(s => Math.min(100, s + 0.5))
           } else if (offCount >= 2) {
-            setCurrentRegion(region); setFocusScore(s => Math.max(0, s - 2))
-            setWarnings(w => { const nw = [...w, { time: ts, type: `Looking ${region}` }]; return nw.length > 20 ? nw.slice(-20) : nw })
+            setCurrentRegion(region)
+            setFocusScore(s => Math.max(0, s - penalty))
+            setWarnings(w => {
+              const detail = widthRatio < 0.8 ? `Head turned ${region} (${Math.round(widthRatio*100)}% face visible)` : `Looking ${region}`
+              const nw = [...w, { time: ts, type: detail }]
+              return nw.length > 20 ? nw.slice(-20) : nw
+            })
           }
+
+          // Distance penalty
           if (dist > 55 || dist < 20) setFocusScore(s => Math.max(0, s - 1))
 
           API.post('/api/exam/detection', {
