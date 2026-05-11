@@ -14,14 +14,30 @@ function analyzeGaze(lm) {
   let irisX = 0, irisY = 0, irisOk = false
   if (lm.length >= 478) {
     irisOk = true
-    const lI=lm[468],lIn=lm[133],lOut=lm[33],lT=lm[159],lB=lm[145]
-    const rI=lm[473],rIn=lm[362],rOut=lm[263],rT=lm[386],rB=lm[374]
-    const lrx=(lI.x-lOut.x)/(Math.abs(lIn.x-lOut.x)||0.001)
-    const rrx=(rI.x-rOut.x)/(Math.abs(rIn.x-rOut.x)||0.001)
-    irisX=((lrx+rrx)/2-0.5)*2
-    const lry=(lI.y-lT.y)/(Math.abs(lB.y-lT.y)||0.001)
-    const rry=(rI.y-rT.y)/(Math.abs(rB.y-rT.y)||0.001)
-    irisY=((lry+rry)/2-0.5)*2
+    // Left eye: use min/max of corners to avoid sign issues
+    // Iris center from all 5 landmarks (468-472) for robustness
+    const lIx = (lm[468].x+lm[469].x+lm[470].x+lm[471].x+lm[472].x)/5
+    const lIy = (lm[468].y+lm[469].y+lm[470].y+lm[471].y+lm[472].y)/5
+    const lMinX = Math.min(lm[33].x, lm[133].x)
+    const lMaxX = Math.max(lm[33].x, lm[133].x)
+    const lMinY = Math.min(lm[159].y, lm[145].y)
+    const lMaxY = Math.max(lm[159].y, lm[145].y)
+    const lRatioX = (lIx - lMinX) / (lMaxX - lMinX || 0.001)  // 0.5 = centered
+    const lRatioY = (lIy - lMinY) / (lMaxY - lMinY || 0.001)
+
+    // Right eye: same approach
+    const rIx = (lm[473].x+lm[474].x+lm[475].x+lm[476].x+lm[477].x)/5
+    const rIy = (lm[473].y+lm[474].y+lm[475].y+lm[476].y+lm[477].y)/5
+    const rMinX = Math.min(lm[263].x, lm[362].x)
+    const rMaxX = Math.max(lm[263].x, lm[362].x)
+    const rMinY = Math.min(lm[386].y, lm[374].y)
+    const rMaxY = Math.max(lm[386].y, lm[374].y)
+    const rRatioX = (rIx - rMinX) / (rMaxX - rMinX || 0.001)
+    const rRatioY = (rIy - rMinY) / (rMaxY - rMinY || 0.001)
+
+    // Average both eyes, normalize to -1..+1 (0 = center)
+    irisX = ((lRatioX + rRatioX) / 2 - 0.5) * 2
+    irisY = ((lRatioY + rRatioY) / 2 - 0.5) * 2
   }
   return { yaw, pitch, irisX, irisY, irisOk }
 }
