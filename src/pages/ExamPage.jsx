@@ -192,6 +192,14 @@ export default function ExamPage() {
   const submitExam=()=>{clearInterval(tmrRef.current);clearInterval(emoRef.current)
     if(rafRef.current)cancelAnimationFrame(rafRef.current);cleanup();setPhase('results')}
 
+  // Re-attach stream when exam phase video element mounts
+  useEffect(() => {
+    if (phase === 'exam' && strRef.current && vidRef.current) {
+      vidRef.current.srcObject = strRef.current
+      vidRef.current.play().catch(() => {})
+    }
+  })
+
   const fmt=s=>`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`
   const total=exam?.qs.length||0,nAns=Object.keys(answers).length
 
