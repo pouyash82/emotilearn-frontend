@@ -3,55 +3,40 @@ import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 
 const BACKEND = 'https://web-production-3a26e.up.railway.app'
 const FC = s => s >= 85 ? '#22c55e' : s >= 70 ? '#3b82f6' : s >= 50 ? '#eab308' : '#ef4444'
+const fmt = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`
 
+/* ─── Gaze analysis (used post-exam on snapshots) ─────────── */
 function analyzeGaze(lm) {
-  const nose = lm[1], lEye = lm[33], rEye = lm[263]
-  const ecx = (lEye.x + rEye.x) / 2
-  const ew = Math.abs(rEye.x - lEye.x) || 0.001
-  const ecy = (lEye.y + rEye.y) / 2
-  const yaw = (nose.x - ecx) / ew
-  const pitch = (nose.y - ecy) / ew
-  let irisX = 0, irisY = 0, irisOk = false
-  if (lm.length >= 478) {
-    irisOk = true
-    // Left eye: use min/max of corners to avoid sign issues
-    // Iris center from all 5 landmarks (468-472) for robustness
-    const lIx = (lm[468].x+lm[469].x+lm[470].x+lm[471].x+lm[472].x)/5
-    const lIy = (lm[468].y+lm[469].y+lm[470].y+lm[471].y+lm[472].y)/5
-    const lMinX = Math.min(lm[33].x, lm[133].x)
-    const lMaxX = Math.max(lm[33].x, lm[133].x)
-    const lMinY = Math.min(lm[159].y, lm[145].y)
-    const lMaxY = Math.max(lm[159].y, lm[145].y)
-    const lRatioX = (lIx - lMinX) / (lMaxX - lMinX || 0.001)  // 0.5 = centered
-    const lRatioY = (lIy - lMinY) / (lMaxY - lMinY || 0.001)
-
-    // Right eye: same approach
-    const rIx = (lm[473].x+lm[474].x+lm[475].x+lm[476].x+lm[477].x)/5
-    const rIy = (lm[473].y+lm[474].y+lm[475].y+lm[476].y+lm[477].y)/5
-    const rMinX = Math.min(lm[263].x, lm[362].x)
-    const rMaxX = Math.max(lm[263].x, lm[362].x)
-    const rMinY = Math.min(lm[386].y, lm[374].y)
-    const rMaxY = Math.max(lm[386].y, lm[374].y)
-    const rRatioX = (rIx - rMinX) / (rMaxX - rMinX || 0.001)
-    const rRatioY = (rIy - rMinY) / (rMaxY - rMinY || 0.001)
-
-    // Average both eyes, normalize to -1..+1 (0 = center)
-    irisX = ((lRatioX + rRatioX) / 2 - 0.5) * 2
-    irisY = ((lRatioY + rRatioY) / 2 - 0.5) * 2
+  const nose=lm[1],lE=lm[33],rE=lm[263]
+  const ecx=(lE.x+rE.x)/2,ew=Math.abs(rE.x-lE.x)||0.001
+  const yaw=(nose.x-ecx)/ew
+  let irisX=0,irisOk=false
+  if(lm.length>=478){
+    irisOk=true
+    const lIx=(lm[468].x+lm[469].x+lm[470].x+lm[471].x+lm[472].x)/5
+    const lMin=Math.min(lm[33].x,lm[133].x),lMax=Math.max(lm[33].x,lm[133].x)
+    const lR=(lIx-lMin)/(lMax-lMin||0.001)
+    const rIx=(lm[473].x+lm[474].x+lm[475].x+lm[476].x+lm[477].x)/5
+    const rMin=Math.min(lm[263].x,lm[362].x),rMax=Math.max(lm[263].x,lm[362].x)
+    const rR=(rIx-rMin)/(rMax-rMin||0.001)
+    irisX=((lR+rR)/2-0.5)*2
   }
-  return { yaw, pitch, irisX, irisY, irisOk }
+  return { yaw, irisX, irisOk }
 }
 
-function classifyFocus(g) {
-  if (!g) return { status:'absent', pen:3, detail:'Face not detected', color:'#ef4444' }
-  const ay=Math.abs(g.yaw), aix=Math.abs(g.irisX)
-  if (ay>0.3) return { status:'head_turned', pen:2.5, detail:`Head ${g.yaw<0?'left':'right'}`, color:'#ef4444' }
-  if (g.irisOk && aix>0.35) return { status:'eyes_sideways', pen:2, detail:`Eyes ${g.irisX<0?'left':'right'}`, color:'#f97316' }
-  if (ay>0.15) return { status:'slight_turn', pen:1, detail:`Slight ${g.yaw<0?'left':'right'}`, color:'#eab308' }
-  if (g.irisOk && aix>0.25) return { status:'slight_glance', pen:0.5, detail:`Glance ${g.irisX<0?'left':'right'}`, color:'#eab308' }
-  return { status:'focused', pen:-0.5, detail:null, color:'#22c55e' }
+function classifyFrame(g, cal) {
+  if(!g) return { s:'absent', d:'Face not detected', c:'#ef4444', p:3 }
+  let ix = g.irisX
+  if(cal) ix -= cal
+  const ay=Math.abs(g.yaw), aix=Math.abs(ix)
+  if(ay>0.3) return { s:'head_turned', d:`Head ${g.yaw<0?'left':'right'}`, c:'#ef4444', p:2.5 }
+  if(g.irisOk&&aix>0.35) return { s:'eyes_sideways', d:`Eyes ${ix<0?'left':'right'}`, c:'#f97316', p:2 }
+  if(ay>0.15) return { s:'slight_turn', d:`Slight ${g.yaw<0?'left':'right'}`, c:'#eab308', p:1 }
+  if(g.irisOk&&aix>0.25) return { s:'glance', d:`Glance ${ix<0?'left':'right'}`, c:'#eab308', p:0.5 }
+  return { s:'focused', d:null, c:'#22c55e', p:0 }
 }
 
+/* ─── Sample exams ────────────────────────────────────────── */
 const EXAMS = [
   { id:'emotilearn', title:'EmotiLearn System Quiz', course:'Graduation Project',
     desc:'Test your understanding of the EmotiLearn system.', time:600, qs:[
@@ -80,210 +65,325 @@ const EXAMS = [
 ]
 
 export default function ExamPage() {
-  const [phase,setPhase]=useState('select')
+  const [phase,setPhase]=useState('select') // select|info|exam|processing|results
   const [exam,setExam]=useState(null)
   const [name,setName]=useState('')
-  const [loadMsg,setLoadMsg]=useState('')
+
+  // Quiz
   const [answers,setAnswers]=useState({})
   const [curQ,setCurQ]=useState(0)
   const [dur,setDur]=useState(0)
   const [timeLeft,setTimeLeft]=useState(0)
-  const [faceOk,setFaceOk]=useState(true)
-  const [emotion,setEmotion]=useState(null)
-  const [focusStatus,setFocusStatus]=useState({status:'focused',detail:null,color:'#22c55e'})
-  const [focus,setFocus]=useState(100)
-  const [checks,setChecks]=useState(0)
-  const [warns,setWarns]=useState([])
-  const [log,setLog]=useState([])
   const [ansTs,setAnsTs]=useState({})
-  const [gapW,setGapW]=useState([])
-  const [dbg,setDbg]=useState('')
 
-  const vidRef=useRef(null),canRef=useRef(null),strRef=useRef(null)
-  const tmrRef=useRef(null),flRef=useRef(null),rafRef=useRef(null),emoRef=useRef(null)
-  const t0=useRef(null),lastAns=useRef(null),focusR=useRef(100),fc=useRef(0),lft=useRef(0)
-  const calRef=useRef({samples:[],baseX:0,baseY:0,done:false}) // iris calibration
+  // Recording
+  const [camOn,setCamOn]=useState(false)
+  const [snapCount,setSnapCount]=useState(0)
+
+  // Processing
+  const [procProgress,setProcProgress]=useState(0)
+  const [procMsg,setProcMsg]=useState('')
+
+  // Results
+  const [examScore,setExamScore]=useState(0)
+  const [focusScore,setFocusScore]=useState(100)
+  const [focusLog,setFocusLog]=useState([])
+  const [alerts,setAlerts]=useState([])
+  const [videoUrl,setVideoUrl]=useState(null)
+  const [gapWarns,setGapWarns]=useState([])
+  const [stats,setStats]=useState({})
+
+  // Refs
+  const vidRef=useRef(null)
+  const canRef=useRef(null)
+  const strRef=useRef(null)
+  const recRef=useRef(null)     // MediaRecorder
+  const chunksRef=useRef([])    // video chunks
+  const snapsRef=useRef([])     // canvas snapshots (ImageData)
+  const snapTsRef=useRef([])    // snapshot timestamps
+  const tmrRef=useRef(null)
+  const snapIntRef=useRef(null)
+  const t0=useRef(null)
+  const lastAns=useRef(null)
 
   useEffect(()=>()=>cleanup(),[])
 
+  // Timer during exam
   useEffect(()=>{
-    if(phase!=='exam'||!exam)return
+    if(phase!=='exam'||!exam) return
     tmrRef.current=setInterval(()=>{
       const el=Math.floor((Date.now()-t0.current)/1000)
-      setDur(el);setTimeLeft(Math.max(0,exam.time-el))
-      if(el>=exam.time)submitExam()
+      setDur(el); setTimeLeft(Math.max(0,exam.time-el))
+      if(el>=exam.time) submitExam()
     },1000)
     return()=>clearInterval(tmrRef.current)
   },[phase])
 
   const cleanup=useCallback(()=>{
-    clearInterval(tmrRef.current);clearInterval(emoRef.current)
-    if(rafRef.current)cancelAnimationFrame(rafRef.current)
+    clearInterval(tmrRef.current); clearInterval(snapIntRef.current)
+    if(recRef.current&&recRef.current.state==='recording') try{recRef.current.stop()}catch{}
     if(strRef.current){strRef.current.getTracks().forEach(t=>t.stop());strRef.current=null}
-    if(vidRef.current)vidRef.current.srcObject=null
-    if(flRef.current){try{flRef.current.close()}catch{};flRef.current=null}
+    if(vidRef.current) vidRef.current.srcObject=null
   },[])
 
-  const initProctoring=async()=>{
-    setLoadMsg('Loading MediaPipe Face Mesh...')
-    try{
-      const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm')
-      setLoadMsg('Loading face landmark model...')
-      const fl=await FaceLandmarker.createFromOptions(vision,{
-        baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',delegate:'GPU'},
-        runningMode:'VIDEO',numFaces:1
+  /* ─── Start exam: camera + recorder + snapshots ──────────── */
+  const startExam=async()=>{
+    if(!name.trim()) return alert('Enter your name')
+
+    // Reset state
+    setAnswers({}); setCurQ(0); setDur(0); setSnapCount(0)
+    setAnsTs({}); setAlerts([]); setFocusLog([]); setGapWarns([])
+    snapsRef.current=[]; snapTsRef.current=[]; chunksRef.current=[]
+    lastAns.current=null; t0.current=Date.now()
+
+    // Start camera
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video:{width:640,height:480,facingMode:'user'}, audio:false
       })
-      flRef.current=fl
-      setLoadMsg('Starting camera...')
-      const stream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:'user'}})
-      if(vidRef.current){vidRef.current.srcObject=stream;await vidRef.current.play()}
-      strRef.current=stream;setLoadMsg('');return true
-    }catch(e){setLoadMsg('');setDbg('Init failed: '+e.message);return false}
+      strRef.current=stream
+      setPhase('exam')
+
+      // Attach to video after DOM renders
+      await new Promise(r=>setTimeout(r,200))
+      if(vidRef.current){vidRef.current.srcObject=stream; await vidRef.current.play()}
+      setCamOn(true)
+
+      // Start MediaRecorder for full video
+      try {
+        const rec=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp9'})
+        rec.ondataavailable=e=>{if(e.data.size>0)chunksRef.current.push(e.data)}
+        rec.start(1000) // chunk every second
+        recRef.current=rec
+      } catch {
+        // Fallback codec
+        try {
+          const rec=new MediaRecorder(stream,{mimeType:'video/webm'})
+          rec.ondataavailable=e=>{if(e.data.size>0)chunksRef.current.push(e.data)}
+          rec.start(1000)
+          recRef.current=rec
+        } catch { console.log('MediaRecorder not supported') }
+      }
+
+      // Snapshot every 3 seconds
+      snapIntRef.current=setInterval(()=>{
+        if(!vidRef.current||!canRef.current||vidRef.current.readyState!==4) return
+        const c=canRef.current, v=vidRef.current
+        c.width=v.videoWidth; c.height=v.videoHeight
+        const ctx=c.getContext('2d')
+        ctx.drawImage(v,0,0)
+        const imgData=ctx.getImageData(0,0,c.width,c.height)
+        snapsRef.current.push(imgData)
+        snapTsRef.current.push(Math.floor((Date.now()-t0.current)/1000))
+        setSnapCount(snapsRef.current.length)
+      },3000)
+
+    } catch(e) { alert('Camera required: '+e.message) }
   }
 
-  const startExam=async()=>{
-    if(!name.trim())return alert('Enter your name')
-    setPhase('loading');setAnswers({});setCurQ(0);setDur(0);setFocus(100);focusR.current=100
-    setChecks(0);setWarns([]);setLog([]);setAnsTs({});setGapW([]);setDbg('')
-    lastAns.current=null;t0.current=Date.now();fc.current=0
-    calRef.current={samples:[],baseX:0,baseY:0,done:false}
-    await new Promise(r=>setTimeout(r,100))
-    const ok=await initProctoring()
-    if(!ok){alert('Could not start proctoring.');setPhase('info');return}
-    setPhase('exam')
-    const loop=()=>{
-      if(!flRef.current||!vidRef.current||vidRef.current.readyState!==4){rafRef.current=requestAnimationFrame(loop);return}
-      const now=performance.now()
-      if(now-lft.current<333){rafRef.current=requestAnimationFrame(loop);return}
-      lft.current=now
-      try{
-        const r=flRef.current.detectForVideo(vidRef.current,now)
-        const ts=Math.floor((Date.now()-t0.current)/1000)
-        fc.current+=1
-        const upd=fc.current%3===0
-        if(r.faceLandmarks&&r.faceLandmarks.length>0){
-          const lm=r.faceLandmarks[0]
-          const gaze=analyzeGaze(lm)
-          // Auto-calibrate iris baseline from first 15 frames
-          const cal=calRef.current
-          if(!cal.done&&gaze.irisOk){
-            cal.samples.push({x:gaze.irisX,y:gaze.irisY})
-            if(cal.samples.length>=15){
-              cal.baseX=cal.samples.reduce((s,v)=>s+v.x,0)/cal.samples.length
-              cal.baseY=cal.samples.reduce((s,v)=>s+v.y,0)/cal.samples.length
-              cal.done=true
-            }
-          }
-          // Apply calibration offset
-          if(cal.done){gaze.irisX-=cal.baseX;gaze.irisY-=cal.baseY}
-          const cls=classifyFocus(gaze)
-          if(cls.pen>0)focusR.current=Math.max(0,focusR.current-cls.pen*0.1)
-          else focusR.current=Math.min(100,focusR.current+0.05)
-          if(upd){
-            setFaceOk(true);setFocusStatus(cls);setFocus(focusR.current);setChecks(c=>c+1)
-            setLog(p=>[...p,{ts,ok:true,s:cls.status}])
-            if(cls.pen>=2)setWarns(w=>{const n=[...w,{t:ts,m:cls.detail}];return n.length>30?n.slice(-30):n})
-          }
-        }else{
-          focusR.current=Math.max(0,focusR.current-0.3)
-          if(upd){
-            setFaceOk(false);setFocusStatus({status:'absent',pen:3,detail:'Face not detected',color:'#ef4444'})
-            setFocus(focusR.current);setChecks(c=>c+1)
-            setLog(p=>[...p,{ts,ok:false,s:'absent'}])
-            setWarns(w=>{const n=[...w,{t:ts,m:'Face absent'}];return n.length>30?n.slice(-30):n})
-          }
-        }
-      }catch{}
-      rafRef.current=requestAnimationFrame(loop)
+  // Re-attach stream on phase change
+  useEffect(()=>{
+    if(phase==='exam'&&strRef.current&&vidRef.current&&!vidRef.current.srcObject){
+      vidRef.current.srcObject=strRef.current
+      vidRef.current.play().catch(()=>{})
     }
-    rafRef.current=requestAnimationFrame(loop)
-    emoRef.current=setInterval(async()=>{
-      if(!vidRef.current||!canRef.current||vidRef.current.readyState!==4)return
-      try{
-        const c=canRef.current,v=vidRef.current;c.width=v.videoWidth;c.height=v.videoHeight
-        c.getContext('2d').drawImage(v,0,0)
-        const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.7))
-        const fd=new FormData();fd.append('file',blob,'f.jpg')
-        const resp=await fetch(`${BACKEND}/api/face-check`,{method:'POST',body:fd})
-        const d=await resp.json()
-        if(d.face_detected&&d.dominant)setEmotion(d.dominant);else setEmotion(null)
-      }catch{}
-    },5000)
-  }
+  },[phase])
 
   const pickAnswer=(qi,oi)=>{
-    const now=Date.now(),ts=Math.floor((now-t0.current)/1000)
+    const now=Date.now(), ts=Math.floor((now-t0.current)/1000)
     setAnsTs(p=>({...p,[qi]:ts}))
-    if(lastAns.current){const gap=Math.round((now-lastAns.current)/1000)
-      if(gap>45){setGapW(p=>[...p,{q:qi+1,gap,ts}]);focusR.current=Math.max(0,focusR.current-2);setFocus(focusR.current)
-        setWarns(w=>[...w.slice(-29),{t:ts,m:`${gap}s gap before Q${qi+1}`}])}}
-    lastAns.current=now;setAnswers(p=>({...p,[qi]:oi}))
+    lastAns.current=now
+    setAnswers(p=>({...p,[qi]:oi}))
   }
 
-  const submitExam=()=>{clearInterval(tmrRef.current);clearInterval(emoRef.current)
-    if(rafRef.current)cancelAnimationFrame(rafRef.current);cleanup();setPhase('results')}
+  /* ─── Submit: stop recording, start processing ──────────── */
+  const submitExam=async()=>{
+    clearInterval(tmrRef.current); clearInterval(snapIntRef.current)
 
-  // Re-attach stream ONCE when exam phase video element mounts
-  useEffect(() => {
-    if (phase === 'exam' && strRef.current && vidRef.current && !vidRef.current.srcObject) {
-      vidRef.current.srcObject = strRef.current
-      vidRef.current.play().catch(() => {})
+    // Stop recorder
+    if(recRef.current&&recRef.current.state==='recording'){
+      recRef.current.stop()
+      await new Promise(r=>setTimeout(r,500)) // wait for final chunks
     }
-  }, [phase])
 
-  const fmt=s=>`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`
-  const total=exam?.qs.length||0,nAns=Object.keys(answers).length
+    // Stop camera
+    if(strRef.current){strRef.current.getTracks().forEach(t=>t.stop());strRef.current=null}
+    if(vidRef.current) vidRef.current.srcObject=null
 
-  if(phase==='select')return(
+    // Create video URL for playback
+    if(chunksRef.current.length>0){
+      const blob=new Blob(chunksRef.current,{type:'video/webm'})
+      setVideoUrl(URL.createObjectURL(blob))
+    }
+
+    // Calculate exam score
+    const correct=exam.qs.filter((q,i)=>answers[i]===q.a).length
+    setExamScore(Math.round(correct/exam.qs.length*100))
+
+    // Check answer timing gaps
+    const gaps=[]
+    const sorted=Object.entries(ansTs).sort((a,b)=>a[1]-b[1])
+    for(let i=1;i<sorted.length;i++){
+      const gap=sorted[i][1]-sorted[i-1][1]
+      if(gap>45) gaps.push({q:parseInt(sorted[i][0])+1, gap, ts:sorted[i][1]})
+    }
+    setGapWarns(gaps)
+
+    // Start MediaPipe processing
+    setPhase('processing')
+    await processSnapshots()
+  }
+
+  /* ─── Process snapshots through MediaPipe ────────────────── */
+  const processSnapshots=async()=>{
+    const snaps=snapsRef.current
+    const timestamps=snapTsRef.current
+
+    if(snaps.length===0){
+      setFocusScore(100); setFocusLog([]); setAlerts([])
+      setStats({present:0,total:0}); setPhase('results'); return
+    }
+
+    setProcMsg('Loading MediaPipe Face Mesh...')
+    setProcProgress(0)
+
+    let fl
+    try {
+      const vision=await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm')
+      fl=await FaceLandmarker.createFromOptions(vision,{
+        baseOptions:{
+          modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',
+          delegate:'GPU'},
+        runningMode:'IMAGE', numFaces:1
+      })
+    } catch(e) {
+      setProcMsg('MediaPipe failed: '+e.message)
+      await new Promise(r=>setTimeout(r,2000))
+      setFocusScore(100); setPhase('results'); return
+    }
+
+    setProcMsg('Analyzing session recording...')
+    const log=[], warns=[]
+    let focus=100, cal=null, calSamples=[]
+
+    // Create offscreen canvas for processing
+    const osc=document.createElement('canvas')
+
+    for(let i=0;i<snaps.length;i++){
+      setProcProgress(Math.round((i/snaps.length)*100))
+      setProcMsg(`Analyzing frame ${i+1} of ${snaps.length}...`)
+
+      const snap=snaps[i], ts=timestamps[i]
+      osc.width=snap.width; osc.height=snap.height
+      osc.getContext('2d').putImageData(snap,0,0)
+
+      try {
+        const result=fl.detect(osc)
+        if(result.faceLandmarks&&result.faceLandmarks.length>0){
+          const gaze=analyzeGaze(result.faceLandmarks[0])
+
+          // Auto-calibrate from first 10 frames
+          if(calSamples.length<10&&gaze.irisOk){
+            calSamples.push(gaze.irisX)
+            if(calSamples.length===10) cal=calSamples.reduce((a,b)=>a+b,0)/10
+          }
+
+          const cls=classifyFrame(gaze, cal)
+          log.push({ts,s:cls.s,d:cls.d,c:cls.c})
+
+          if(cls.p>0){ focus=Math.max(0,focus-cls.p*0.5) }
+          else { focus=Math.min(100,focus+0.3) }
+
+          if(cls.p>=2) warns.push({t:ts,m:cls.d})
+        } else {
+          log.push({ts,s:'absent',d:'Face not detected',c:'#ef4444'})
+          focus=Math.max(0,focus-1.5)
+          warns.push({t:ts,m:'Face not detected'})
+        }
+      } catch {
+        log.push({ts,s:'error',d:'Analysis error',c:'#6b7280'})
+      }
+
+      // Yield to UI for progress updates
+      if(i%5===0) await new Promise(r=>setTimeout(r,10))
+    }
+
+    fl.close()
+
+    const present=log.filter(l=>l.s!=='absent'&&l.s!=='error').length
+    setFocusScore(Math.round(focus))
+    setFocusLog(log)
+    setAlerts(warns)
+    setStats({present,total:log.length,pct:log.length?Math.round(present/log.length*100):100})
+    setProcProgress(100)
+    setProcMsg('Analysis complete!')
+
+    // Save to backend
+    try {
+      await fetch(`${BACKEND}/api/exam/end`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({exam_id:`exam_${Date.now()}`})
+      })
+    } catch{}
+
+    await new Promise(r=>setTimeout(r,500))
+    setPhase('results')
+  }
+
+  const total=exam?.qs.length||0, nAns=Object.keys(answers).length
+
+  // ════════════ SELECT ════════════
+  if(phase==='select') return(
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6">
       <div className="max-w-2xl w-full space-y-4">
-        <div className="text-center mb-8"><div className="text-5xl mb-3">🔒</div>
+        <div className="text-center mb-8">
+          <div className="text-5xl mb-3">🔒</div>
           <h1 className="text-3xl font-black text-white mb-2">Proctored Exams</h1>
-          <p className="text-gray-400 text-sm">Eye gaze + head tracking via MediaPipe Face Mesh</p></div>
+          <p className="text-gray-400 text-sm">Your session is recorded and analyzed after submission.</p>
+        </div>
         {EXAMS.map(ex=>(
           <button key={ex.id} onClick={()=>{setExam(ex);setPhase('info')}}
             className="w-full text-left bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-blue-500/30 transition-all group">
             <div className="text-xs text-blue-400 font-bold uppercase mb-1">{ex.course}</div>
             <div className="text-white font-bold text-lg group-hover:text-blue-400">{ex.title}</div>
             <div className="text-gray-500 text-sm mt-1">{ex.desc}</div>
-            <div className="flex gap-4 mt-3 text-xs text-gray-600"><span>📝 {ex.qs.length}q</span><span>⏱ {Math.floor(ex.time/60)}min</span><span>📹 478-point tracking</span></div>
+            <div className="flex gap-4 mt-3 text-xs text-gray-600">
+              <span>📝 {ex.qs.length} questions</span><span>⏱ {Math.floor(ex.time/60)} min</span><span>📹 Recorded + analyzed</span>
+            </div>
           </button>))}
       </div></div>)
 
-  if(phase==='info')return(
+  // ════════════ INFO ════════════
+  if(phase==='info') return(
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8">
-        <div className="text-center mb-5"><div className="text-xs text-blue-400 font-bold uppercase">{exam.course}</div>
+        <div className="text-center mb-5">
+          <div className="text-xs text-blue-400 font-bold uppercase">{exam.course}</div>
           <h2 className="text-2xl font-black text-white mt-1">{exam.title}</h2></div>
         <div className="grid grid-cols-3 gap-3 mb-5">
           <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5"><div className="text-white font-bold">{exam.qs.length}</div><div className="text-xs text-gray-500">Questions</div></div>
           <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5"><div className="text-white font-bold">{Math.floor(exam.time/60)}m</div><div className="text-xs text-gray-500">Time</div></div>
-          <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5"><div className="text-white font-bold">Iris</div><div className="text-xs text-gray-500">Tracking</div></div></div>
+          <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5"><div className="text-white font-bold">Video</div><div className="text-xs text-gray-500">Recorded</div></div></div>
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-5 text-sm text-red-300">
-          <div className="font-bold mb-2">⚠️ Anti-Cheat:</div>
+          <div className="font-bold mb-2">⚠️ How proctoring works:</div>
           <div className="text-xs text-red-400 space-y-1">
-            <div>• MediaPipe Face Mesh — 478 landmarks at 5fps</div>
-            <div>• Iris tracking — detects eye glances</div>
-            <div>• Head rotation — detects turning away</div>
-            <div>• Answer timing — flags 45s+ gaps</div></div></div>
+            <div>• Your webcam records the entire session</div>
+            <div>• After you submit, AI analyzes your recording</div>
+            <div>• Head turns, eye movements, and face absence are detected</div>
+            <div>• Long gaps between answers are flagged</div>
+            <div>• Teacher receives your score + focus report + recording</div>
+          </div></div>
         <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="Your full name..."
           className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-600 focus:border-blue-500/50 focus:outline-none mb-4"/>
         <div className="flex gap-3">
           <button onClick={()=>setPhase('select')} className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10">← Back</button>
-          <button onClick={startExam} disabled={!name.trim()} className="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-red-500 to-rose-500 text-white disabled:opacity-40">🔒 Begin</button></div>
-      </div></div>)
+          <button onClick={startExam} disabled={!name.trim()} className="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-red-500 to-rose-500 text-white disabled:opacity-40">🔒 Begin Exam</button>
+        </div></div></div>)
 
-  if(phase==='loading')return(
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6">
-      <div className="text-center">
-        <video ref={vidRef} autoPlay playsInline muted className="hidden"/><canvas ref={canRef} className="hidden"/>
-        <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"/>
-        <div className="text-white font-bold text-lg mb-2">Initializing Proctoring</div>
-        <div className="text-gray-400 text-sm">{loadMsg||'Please wait...'}</div>
-        {dbg&&<div className="text-red-400 text-xs mt-4 max-w-sm">{dbg}</div>}
-      </div></div>)
-
-  if(phase==='exam'){const q=exam.qs[curQ];return(
+  // ════════════ EXAM (zero processing, just record) ════════════
+  if(phase==='exam'){const q=exam.qs[curQ]; return(
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3">
       <div className="flex items-center justify-between mb-3 bg-white/5 rounded-xl px-4 py-2 border border-white/10 text-sm">
         <div className="flex items-center gap-3">
@@ -291,9 +391,8 @@ export default function ExamPage() {
           <span className="text-gray-600">|</span><span className="text-gray-400">{name}</span>
           <span className="text-gray-600">|</span><span className="text-gray-400">{nAns}/{total}</span></div>
         <div className="flex items-center gap-3">
-          <span className={`font-mono font-bold ${timeLeft<60?'text-red-400 animate-pulse':'text-gray-400'}`}>⏱{fmt(timeLeft)}</span>
-          <div className="w-2.5 h-2.5 rounded-full" style={{background:focusStatus.color}}/>
-          <span className="font-bold" style={{color:FC(focus)}}>{Math.round(focus)}%</span></div></div>
+          <span className={`font-mono font-bold ${timeLeft<60?'text-red-400 animate-pulse':'text-gray-400'}`}>⏱ {fmt(timeLeft)}</span>
+          <span className="text-gray-500 text-xs">📸 {snapCount} frames</span></div></div>
       <div className="grid grid-cols-4 gap-3" style={{height:'calc(100vh - 72px)'}}>
         <div className="col-span-3 overflow-auto">
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
@@ -313,65 +412,98 @@ export default function ExamPage() {
               {curQ<total-1?<button onClick={()=>setCurQ(curQ+1)} className="px-5 py-2 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400">Next →</button>
               :<button onClick={submitExam} disabled={nAns<total} className="px-6 py-2 rounded-xl font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white disabled:opacity-40">✓ Submit ({nAns}/{total})</button>}
             </div></div></div>
-        <div className="space-y-3 overflow-auto">
-          <div className="rounded-2xl overflow-hidden border-2 transition-colors" style={{borderColor:focusStatus.color+'66'}}>
+        {/* Camera preview — just recording, no processing */}
+        <div className="space-y-3">
+          <div className="rounded-2xl overflow-hidden border-2 border-red-500/30">
             <div className="relative bg-black aspect-[3/4]">
               <video ref={vidRef} autoPlay playsInline muted className="w-full h-full object-cover"/>
               <canvas ref={canRef} className="hidden"/>
-              <div className="absolute top-2 left-2"><div className="px-2 py-1 rounded text-[10px] font-bold text-white" style={{background:focusStatus.color+'cc'}}>
-                {focusStatus.status==='focused'?'✅ Focused':focusStatus.status==='absent'?'🔴 Away':'⚠️ '+(focusStatus.detail||focusStatus.status)}</div></div>
-              {emotion&&<div className="absolute top-2 right-2 px-2 py-1 rounded bg-black/60 text-white text-[10px] font-bold capitalize">{emotion}</div>}
-              <div className="absolute bottom-2 left-2 px-2 py-1 rounded bg-red-500/80 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"/><span className="text-white text-[10px] font-bold">REC</span></div>
-              {!faceOk&&<div className="absolute inset-0 flex items-center justify-center bg-red-900/40"><div className="text-center"><div className="text-3xl">⚠️</div><div className="text-red-200 text-xs font-bold">Look at screen!</div></div></div>}
+              <div className="absolute top-2 left-2 px-2 py-1 rounded bg-red-500/80 flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"/><span className="text-white text-[10px] font-bold">REC</span></div>
+              <div className="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/60 text-white text-[10px]">📸 {snapCount} snapshots</div>
             </div></div>
           <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
-            <div className="text-2xl font-black" style={{color:FC(focus)}}>{Math.round(focus)}%</div>
-            <div className="text-[10px] text-gray-500">Focus</div>
-            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mt-2"><div className="h-full rounded-full transition-all" style={{width:`${Math.max(0,focus)}%`,background:FC(focus)}}/></div></div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-2 text-[11px] space-y-1">
-            <div className="flex justify-between"><span className="text-gray-500">Checks</span><span className="text-white font-bold">{checks}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Status</span><span className="font-bold" style={{color:focusStatus.color}}>{focusStatus.status}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Alerts</span><span className="text-yellow-400 font-bold">{warns.length}</span></div></div>
-          {warns.length>0&&<div className="bg-red-500/5 border border-red-500/10 rounded-xl p-2 max-h-24 overflow-y-auto">
-            {warns.slice(-5).map((w,i)=><div key={i} className="text-[9px] text-red-300 py-0.5">{fmt(w.t)} — {w.m}</div>)}</div>}
-          {dbg&&<div className="text-[9px] text-yellow-400 bg-yellow-500/10 rounded p-1 break-all">{dbg}</div>}
-        </div></div></div>)}
+            <div className="text-xs text-gray-400">Session recorded</div>
+            <div className="text-[10px] text-gray-600 mt-1">AI analysis runs after you submit</div>
+          </div></div>
+      </div></div>)}
 
+  // ════════════ PROCESSING ════════════
+  if(phase==='processing') return(
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6">
+      <div className="max-w-md w-full text-center">
+        <div className="text-5xl mb-4">🔍</div>
+        <h2 className="text-2xl font-black text-white mb-2">Analyzing Your Session</h2>
+        <p className="text-gray-400 text-sm mb-6">{procMsg}</p>
+        <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden mb-4">
+          <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-300" style={{width:`${procProgress}%`}}/></div>
+        <div className="text-white font-mono font-bold text-lg">{procProgress}%</div>
+        <div className="text-gray-500 text-xs mt-2">{snapsRef.current.length} frames to analyze • Please wait...</div>
+      </div></div>)
+
+  // ════════════ RESULTS ════════════
   const correct=exam?.qs.filter((q,i)=>answers[i]===q.a).length||0
   const pct=total?Math.round(correct/total*100):0
-  const fl=log.filter(l=>l.ok).length,ppct=log.length?Math.round(fl/log.length*100):100
-  const hw=warns.filter(w=>w.m?.includes('Head')||w.m?.includes('head')).length
-  const ew=warns.filter(w=>w.m?.includes('Eyes')||w.m?.includes('eyes')||w.m?.includes('Glance')||w.m?.includes('glance')).length
+  const hw=alerts.filter(a=>a.m?.includes('Head')||a.m?.includes('head')).length
+  const ew=alerts.filter(a=>a.m?.includes('Eyes')||a.m?.includes('eyes')||a.m?.includes('Glance')||a.m?.includes('glance')).length
+  const aw=alerts.filter(a=>a.m?.includes('absent')||a.m?.includes('Face')).length
 
   return(
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Scores */}
         <div className="text-center bg-white/5 border border-white/10 rounded-2xl p-8">
           <div className="text-xs text-blue-400 font-bold uppercase">{exam?.course}</div>
           <h2 className="text-2xl font-black text-white mt-1 mb-1">{exam?.title} — Results</h2>
           <p className="text-gray-500 text-sm mb-6">{name} · {fmt(dur)}</p>
-          <div className="grid grid-cols-4 gap-4">
-            {[{v:`${pct}%`,l:'Score',s:`${correct}/${total}`,c:pct>=70?'#22c55e':pct>=50?'#eab308':'#ef4444'},
-              {v:`${Math.round(focus)}%`,l:'Focus',s:focus>=85?'Excellent':focus>=70?'Good':focus>=50?'Moderate':'Poor',c:FC(focus)},
-              {v:`${ppct}%`,l:'Present',s:`${fl}/${log.length}`,c:ppct>=90?'#22c55e':'#eab308'},
-              {v:warns.length,l:'Alerts',s:`${hw} head · ${ew} eyes`,c:warns.length===0?'#22c55e':warns.length<=5?'#eab308':'#ef4444'}
+          <div className="grid grid-cols-5 gap-3">
+            {[
+              {v:`${pct}%`,l:'Exam Score',s:`${correct}/${total}`,c:pct>=70?'#22c55e':pct>=50?'#eab308':'#ef4444'},
+              {v:`${focusScore}%`,l:'Focus Score',s:focusScore>=85?'Excellent':focusScore>=70?'Good':focusScore>=50?'Moderate':'Poor',c:FC(focusScore)},
+              {v:`${stats.pct||100}%`,l:'Present',s:`${stats.present||0}/${stats.total||0}`,c:(stats.pct||100)>=90?'#22c55e':'#eab308'},
+              {v:alerts.length,l:'Alerts',s:`${hw}h ${ew}e ${aw}a`,c:alerts.length===0?'#22c55e':alerts.length<=5?'#eab308':'#ef4444'},
+              {v:gapWarns.length,l:'Timing',s:'flags',c:gapWarns.length===0?'#22c55e':'#ef4444'},
             ].map(x=>(
               <div key={x.l} className="bg-white/5 rounded-xl p-4 border border-white/5">
-                <div className="text-3xl font-black" style={{color:x.c}}>{x.v}</div>
-                <div className="text-gray-400 text-sm mt-1">{x.l}</div>
-                <div className="text-xs text-gray-500">{x.s}</div></div>))}</div></div>
-        {log.length>0&&<div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="text-white font-bold mb-3">Focus Timeline</h3>
-          <div className="flex gap-[1px] h-8 rounded-lg overflow-hidden">
-            {log.map((e,i)=><div key={i} className="flex-1" style={{background:e.ok?(e.s==='focused'?'#22c55e':e.s==='slight_turn'||e.s==='slight_glance'?'#eab308':'#f97316'):'#ef4444'}}/>)}</div>
-          <div className="flex justify-between mt-1 text-xs text-gray-600"><span>Start</span>
-            <span className="flex gap-3"><span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-sm"/>Focused</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 bg-yellow-500 rounded-sm"/>Glance</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 bg-orange-500 rounded-sm"/>Turned</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-500 rounded-sm"/>Away</span></span><span>End</span></div></div>}
-        {gapW.length>0&&<div className="bg-yellow-500/5 border border-yellow-500/10 rounded-2xl p-6">
-          <h3 className="text-yellow-400 font-bold mb-3">⏱ Answer Timing Flags</h3>
-          {gapW.map((g,i)=><div key={i} className="text-sm text-yellow-300 bg-yellow-500/10 rounded-xl px-4 py-2 mb-1 flex justify-between"><span>Q{g.q}: {g.gap}s delay</span><span className="text-yellow-500 text-xs">{fmt(g.ts)}</span></div>)}</div>}
+                <div className="text-2xl font-black" style={{color:x.c}}>{x.v}</div>
+                <div className="text-gray-400 text-xs mt-1">{x.l}</div>
+                <div className="text-[10px] text-gray-600">{x.s}</div></div>))}</div></div>
+
+        {/* Video playback + Focus timeline side by side */}
+        <div className="grid grid-cols-2 gap-6">
+          {videoUrl && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <h3 className="text-white font-bold mb-3">📹 Session Recording</h3>
+              <video src={videoUrl} controls className="w-full rounded-xl" />
+            </div>)}
+          {focusLog.length>0 && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <h3 className="text-white font-bold mb-3">Focus Timeline</h3>
+              <div className="flex gap-[1px] h-10 rounded-lg overflow-hidden mb-2">
+                {focusLog.map((e,i)=><div key={i} className="flex-1" title={`${fmt(e.ts)} — ${e.d||e.s}`}
+                  style={{background:e.c||'#6b7280'}}/>)}</div>
+              <div className="flex justify-between text-xs text-gray-600"><span>Start</span>
+                <span className="flex gap-2">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-sm"/>Focused</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 bg-yellow-500 rounded-sm"/>Glance</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 bg-orange-500 rounded-sm"/>Turned</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-500 rounded-sm"/>Away</span>
+                </span><span>End</span></div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white/5 rounded-lg p-2 text-center"><span className="text-white font-bold">{hw}</span><span className="text-gray-500 ml-1">head turns</span></div>
+                <div className="bg-white/5 rounded-lg p-2 text-center"><span className="text-white font-bold">{ew}</span><span className="text-gray-500 ml-1">eye glances</span></div>
+                <div className="bg-white/5 rounded-lg p-2 text-center"><span className="text-white font-bold">{aw}</span><span className="text-gray-500 ml-1">face absent</span></div>
+                <div className="bg-white/5 rounded-lg p-2 text-center"><span className="text-white font-bold">{gapWarns.length}</span><span className="text-gray-500 ml-1">timing flags</span></div>
+              </div></div>)}
+        </div>
+
+        {/* Timing flags */}
+        {gapWarns.length>0&&(
+          <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-2xl p-6">
+            <h3 className="text-yellow-400 font-bold mb-3">⏱ Answer Timing Flags</h3>
+            {gapWarns.map((g,i)=><div key={i} className="text-sm text-yellow-300 bg-yellow-500/10 rounded-xl px-4 py-2 mb-1 flex justify-between"><span>Q{g.q}: {g.gap}s delay</span><span className="text-yellow-500 text-xs">{fmt(g.ts)}</span></div>)}</div>)}
+
+        {/* Answer review */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="text-white font-bold mb-4">Answer Review</h3>
           {exam?.qs.map((q,i)=>{const s=answers[i],ok=s===q.a;return(
@@ -381,10 +513,16 @@ export default function ExamPage() {
               <div className="text-xs mt-1 ml-6"><span className={ok?'text-green-400':'text-red-400'}>{s!==undefined?q.o[s]:'Not answered'}</span>
                 {!ok&&s!==undefined&&<span className="text-green-400 ml-2">· {q.o[q.a]}</span>}
                 {ansTs[i]!==undefined&&<span className="text-gray-600 ml-2">at {fmt(ansTs[i])}</span>}</div></div>)})}</div>
-        {warns.length>0&&<div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="text-white font-bold mb-3">⚠️ All Alerts ({warns.length})</h3>
-          <div className="max-h-40 overflow-y-auto space-y-1">{warns.map((w,i)=><div key={i} className="text-sm text-red-300 bg-red-500/10 rounded-lg px-3 py-2">{fmt(w.t)} — {w.m}</div>)}</div></div>}
-        <div className="text-center pb-8"><button onClick={()=>{setPhase('select');setExam(null);setAnswers({});setWarns([]);setLog([])}}
-          className="px-8 py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg">← Another Exam</button></div>
+
+        {/* All alerts */}
+        {alerts.length>0&&(
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <h3 className="text-white font-bold mb-3">⚠️ All Proctoring Alerts ({alerts.length})</h3>
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {alerts.map((w,i)=><div key={i} className="text-sm text-red-300 bg-red-500/10 rounded-lg px-3 py-2">{fmt(w.t)} — {w.m}</div>)}</div></div>)}
+
+        <div className="text-center pb-8">
+          <button onClick={()=>{setPhase('select');setExam(null);setAnswers({});setAlerts([]);setFocusLog([]);if(videoUrl)URL.revokeObjectURL(videoUrl);setVideoUrl(null)}}
+            className="px-8 py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg">← Another Exam</button></div>
       </div></div>)
 }
