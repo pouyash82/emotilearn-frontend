@@ -3,241 +3,253 @@ import API from '../api'
 
 const focusColor = (s) => s >= 85 ? '#22c55e' : s >= 70 ? '#3b82f6' : s >= 50 ? '#eab308' : '#ef4444'
 
-const SAMPLE_EXAMS = {
-  'emotilearn-quiz': {
+const EXAMS = {
+  'emotilearn': {
     title: 'EmotiLearn System Quiz',
-    description: 'Test your understanding of the EmotiLearn facial emotion recognition system.',
-    timeLimit: 600, // 10 minutes
-    questions: [
-      { q: "What is the primary architecture used in EmotiLearn for facial emotion recognition?", opts: ["ResNet-50", "EfficientNet-B2", "VGG-16", "MobileNet-V3"], ans: 1 },
-      { q: "How many basic emotions does the system classify?", opts: ["5", "6", "7", "8"], ans: 2 },
-      { q: "Which datasets were combined for training the emotion model?", opts: ["ImageNet + CIFAR", "FER-2013 + RAF-DB", "CelebA + AffectNet", "COCO + VGGFace"], ans: 1 },
-      { q: "What speech-to-text model is used for live transcription?", opts: ["Google Speech API", "DeepSpeech", "OpenAI Whisper", "Amazon Transcribe"], ans: 2 },
-      { q: "What fusion weight is assigned to facial emotion in the tri-signal system?", opts: ["30%", "40%", "50%", "60%"], ans: 2 },
-      { q: "Which model analyzes voice tone emotion from audio waveforms?", opts: ["BERT", "wav2vec2", "GPT-4", "YOLO"], ans: 1 },
-      { q: "What framework is the EmotiLearn backend built with?", opts: ["Django", "Flask", "FastAPI", "Express.js"], ans: 2 },
-      { q: "Which face detection method does EmotiLearn use?", opts: ["MTCNN", "Haar Cascade", "RetinaFace", "BlazeFace"], ans: 1 },
-      { q: "What database is used for session persistence?", opts: ["MongoDB", "MySQL", "PostgreSQL", "SQLite"], ans: 2 },
-      { q: "What is the approximate accuracy of the fine-tuned model?", opts: ["65%", "72%", "82%", "95%"], ans: 2 },
+    course: 'Graduation Project',
+    desc: 'Test your understanding of the EmotiLearn system.',
+    time: 600,
+    qs: [
+      { q: "What is the primary architecture used in EmotiLearn for facial emotion recognition?", o: ["ResNet-50", "EfficientNet-B2", "VGG-16", "MobileNet-V3"], a: 1 },
+      { q: "How many basic emotions does the system classify?", o: ["5", "6", "7", "8"], a: 2 },
+      { q: "Which datasets were combined for training?", o: ["ImageNet + CIFAR", "FER-2013 + RAF-DB", "CelebA + AffectNet", "COCO + VGGFace"], a: 1 },
+      { q: "What speech-to-text model provides live transcription?", o: ["Google Speech", "DeepSpeech", "OpenAI Whisper", "Amazon Transcribe"], a: 2 },
+      { q: "What fusion weight is assigned to facial emotion?", o: ["30%", "40%", "50%", "60%"], a: 2 },
+      { q: "Which model analyzes voice tone from audio?", o: ["BERT", "wav2vec2", "GPT-4", "YOLO"], a: 1 },
+      { q: "What backend framework does EmotiLearn use?", o: ["Django", "Flask", "FastAPI", "Express.js"], a: 2 },
+      { q: "Which face detection method is used?", o: ["MTCNN", "Haar Cascade", "RetinaFace", "BlazeFace"], a: 1 },
+      { q: "What database stores session data?", o: ["MongoDB", "MySQL", "PostgreSQL", "SQLite"], a: 2 },
+      { q: "What is the model's approximate accuracy?", o: ["65%", "72%", "82%", "95%"], a: 2 },
     ],
   },
-  'ml-basics': {
-    title: 'Machine Learning Basics',
-    description: 'A quick quiz on fundamental machine learning concepts.',
-    timeLimit: 480,
-    questions: [
-      { q: "What is overfitting?", opts: ["Model is too simple", "Model memorizes training data", "Model is underfitting", "Model has high bias"], ans: 1 },
-      { q: "Which is a supervised learning algorithm?", opts: ["K-Means", "PCA", "Random Forest", "DBSCAN"], ans: 2 },
-      { q: "What does CNN stand for?", opts: ["Central Neural Network", "Convolutional Neural Network", "Connected Node Network", "Computed Neural Network"], ans: 1 },
-      { q: "What is the purpose of a loss function?", opts: ["Speed up training", "Measure prediction error", "Increase accuracy", "Reduce dataset size"], ans: 1 },
-      { q: "What is transfer learning?", opts: ["Training from scratch", "Using a pre-trained model on new data", "Transferring data between servers", "A type of clustering"], ans: 1 },
-      { q: "What activation function is commonly used in output layers for classification?", opts: ["ReLU", "Sigmoid", "Softmax", "Tanh"], ans: 2 },
-      { q: "What is an epoch in training?", opts: ["A single batch", "One pass through the entire dataset", "A learning rate step", "A layer in the network"], ans: 1 },
-      { q: "What does dropout do?", opts: ["Increases learning rate", "Randomly disables neurons to prevent overfitting", "Removes data samples", "Compresses the model"], ans: 1 },
+  'ml-fundamentals': {
+    title: 'Machine Learning Fundamentals',
+    course: 'Computer Engineering',
+    desc: 'Core ML concepts every engineer should know.',
+    time: 480,
+    qs: [
+      { q: "What is overfitting?", o: ["Model too simple", "Model memorizes training data", "Model underfits", "Model has high bias"], a: 1 },
+      { q: "Which is a supervised learning algorithm?", o: ["K-Means", "PCA", "Random Forest", "DBSCAN"], a: 2 },
+      { q: "What does CNN stand for?", o: ["Central Neural Network", "Convolutional Neural Network", "Connected Node Network", "Computed Neural Net"], a: 1 },
+      { q: "Purpose of a loss function?", o: ["Speed up training", "Measure prediction error", "Increase accuracy", "Reduce dataset"], a: 1 },
+      { q: "What is transfer learning?", o: ["Training from scratch", "Using pre-trained model on new data", "Moving data between servers", "A clustering type"], a: 1 },
+      { q: "Common output activation for classification?", o: ["ReLU", "Sigmoid", "Softmax", "Tanh"], a: 2 },
+      { q: "What is an epoch?", o: ["A single batch", "One pass through entire dataset", "A learning rate step", "A network layer"], a: 1 },
+      { q: "What does dropout prevent?", o: ["Underfitting", "Overfitting", "Gradient explosion", "Data leakage"], a: 1 },
     ],
   },
 }
 
 export default function ExamPage() {
-  const [phase, setPhase] = useState('select') // select | info | exam | results
-  const [selectedExam, setSelectedExam] = useState(null)
-  const [studentName, setStudentName] = useState('')
+  const [phase, setPhase] = useState('select')
+  const [examKey, setExamKey] = useState(null)
+  const [name, setName] = useState('')
   const [answers, setAnswers] = useState({})
   const [currentQ, setCurrentQ] = useState(0)
-  const [examScore, setExamScore] = useState(0)
   const [duration, setDuration] = useState(0)
   const [timeLeft, setTimeLeft] = useState(0)
 
-  // Proctoring
+  // Focus tracking
   const [cameraOn, setCameraOn] = useState(false)
+  const [facePresent, setFacePresent] = useState(true)
   const [currentEmotion, setCurrentEmotion] = useState(null)
-  const [currentRegion, setCurrentRegion] = useState('center')
   const [focusScore, setFocusScore] = useState(100)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [detectionCount, setDetectionCount] = useState(0)
-  const [interactionCount, setInteractionCount] = useState(0)
+  const [detections, setDetections] = useState(0)
+  const [absenceStreak, setAbsenceStreak] = useState(0)
   const [warnings, setWarnings] = useState([])
-  const [faceDistance, setFaceDistance] = useState(null)
   const [focusLog, setFocusLog] = useState([])
+  const [isProcessing, setIsProcessing] = useState(false)
+
+  // Answer timing
+  const [answerTimes, setAnswerTimes] = useState({})
+  const [lastAnswerTime, setLastAnswerTime] = useState(null)
+  const [answerGapWarnings, setAnswerGapWarnings] = useState([])
 
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
   const intervalRef = useRef(null)
-  const durationRef = useRef(null)
   const timerRef = useRef(null)
-  const startTimeRef = useRef(null)
+  const startRef = useRef(null)
   const isAnalyzingRef = useRef(false)
-  const lastInteractionRef = useRef(Date.now())
-  const gazeBufferRef = useRef([])
-  const baselineFaceRef = useRef(null)
+  const absenceRef = useRef(0)
+
+  const exam = examKey ? EXAMS[examKey] : null
+  const total = exam?.qs.length || 0
+  const answered = Object.keys(answers).length
 
   useEffect(() => () => cleanup(), [])
 
   useEffect(() => {
-    if (phase === 'exam' && selectedExam) {
-      durationRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000)
-        setDuration(elapsed)
-        const remaining = Math.max(0, selectedExam.timeLimit - elapsed)
-        setTimeLeft(remaining)
-        if (remaining <= 0) submitExam()
-      }, 1000)
-    }
-    return () => clearInterval(durationRef.current)
-  }, [phase])
-
-  useEffect(() => {
     if (phase !== 'exam') return
-    const log = () => { lastInteractionRef.current = Date.now(); setInteractionCount(c => c + 1) }
-    window.addEventListener('keydown', log)
-    return () => window.removeEventListener('keydown', log)
+    timerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startRef.current) / 1000)
+      setDuration(elapsed)
+      setTimeLeft(Math.max(0, exam.time - elapsed))
+      if (elapsed >= exam.time) submitExam()
+    }, 1000)
+    return () => clearInterval(timerRef.current)
   }, [phase])
 
   const startWebcam = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })
-      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play() }
-      streamRef.current = stream; setCameraOn(true); return true
-    } catch { alert('Camera access is REQUIRED for this proctored exam.'); return false }
+      const s = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })
+      if (videoRef.current) { videoRef.current.srcObject = s; await videoRef.current.play() }
+      streamRef.current = s; setCameraOn(true); return true
+    } catch { alert('Camera is REQUIRED for this proctored exam.'); return false }
   }
 
   const cleanup = useCallback(() => {
-    clearInterval(intervalRef.current); clearInterval(durationRef.current)
+    clearInterval(intervalRef.current); clearInterval(timerRef.current)
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null }
     if (videoRef.current) videoRef.current.srcObject = null
     setCameraOn(false); isAnalyzingRef.current = false
   }, [])
 
   const beginExam = () => {
-    if (!studentName.trim()) { alert('Please enter your name'); return }
-    setPhase('exam')
-    setAnswers({}); setCurrentQ(0); setExamScore(0)
-    setDuration(0); setTimeLeft(selectedExam.timeLimit)
-    setDetectionCount(0); setInteractionCount(0); setWarnings([]); setFocusScore(100); setFocusLog([])
-    gazeBufferRef.current = []; baselineFaceRef.current = null
-    startTimeRef.current = Date.now(); lastInteractionRef.current = Date.now()
+    if (!name.trim()) { alert('Please enter your name'); return }
+    setPhase('exam'); setAnswers({}); setCurrentQ(0); setDuration(0)
+    setFocusScore(100); setDetections(0); setAbsenceStreak(0)
+    setWarnings([]); setFocusLog([]); setAnswerTimes({}); setAnswerGapWarnings([])
+    setLastAnswerTime(null); absenceRef.current = 0
+    startRef.current = Date.now()
   }
 
   useEffect(() => {
     if (phase !== 'exam') return
-    let cancelled = false
+    let c = false
     const init = async () => {
       await new Promise(r => setTimeout(r, 200))
-      if (cancelled) return
+      if (c) return
       const ok = await startWebcam()
-      if (ok && !cancelled) {
-        intervalRef.current = setInterval(captureFrame, 3000)
-        setTimeout(captureFrame, 600)
+      if (ok && !c) {
+        intervalRef.current = setInterval(checkFocus, 3000)
+        setTimeout(checkFocus, 500)
       }
     }
     init()
-    return () => { cancelled = true }
+    return () => { c = true }
   }, [phase])
 
   const selectAnswer = (qIdx, optIdx) => {
+    const now = Date.now()
+    const ts = Math.floor((now - startRef.current) / 1000)
+
+    // Track per-question answer time
+    setAnswerTimes(prev => ({ ...prev, [qIdx]: ts }))
+
+    // Check gap since last answer
+    if (lastAnswerTime) {
+      const gap = (now - lastAnswerTime) / 1000
+      if (gap > 45) {
+        setAnswerGapWarnings(prev => [...prev, { q: qIdx + 1, gap: Math.round(gap), time: ts }])
+        setFocusScore(s => Math.max(0, s - 2))
+        setWarnings(w => {
+          const nw = [...w, { time: ts, type: `${Math.round(gap)}s gap before Q${qIdx + 1}` }]
+          return nw.length > 30 ? nw.slice(-30) : nw
+        })
+      }
+    }
+    setLastAnswerTime(now)
     setAnswers(prev => ({ ...prev, [qIdx]: optIdx }))
-    lastInteractionRef.current = Date.now()
-    setInteractionCount(c => c + 1)
   }
 
   const submitExam = () => {
-    clearInterval(intervalRef.current); clearInterval(durationRef.current); cleanup()
-    let correct = 0
-    selectedExam.questions.forEach((q, i) => { if (answers[i] === q.ans) correct++ })
-    setExamScore(Math.round((correct / selectedExam.questions.length) * 100))
+    clearInterval(intervalRef.current); clearInterval(timerRef.current); cleanup()
     setPhase('results')
   }
 
-  const captureFrame = async () => {
+  // ══════════════════════════════════════════════════════════════════
+  // FOCUS CHECK — simple and reliable:
+  // Face detected = focused (+0.5). Face gone = not focused (-3).
+  // Uses /api/detect-emotion-multi — same endpoint as Live Session.
+  // ══════════════════════════════════════════════════════════════════
+  const checkFocus = async () => {
     if (isAnalyzingRef.current || !videoRef.current || !canvasRef.current) return
     const video = videoRef.current, canvas = canvasRef.current
     if (video.readyState !== 4) return
     isAnalyzingRef.current = true; setIsProcessing(true)
+
     try {
       const ctx = canvas.getContext('2d')
       canvas.width = video.videoWidth; canvas.height = video.videoHeight
       ctx.drawImage(video, 0, 0)
       const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8))
-      const formData = new FormData()
-      formData.append('file', blob, 'frame.jpg')
-      const controller = new AbortController()
-      const tid = setTimeout(() => controller.abort(), 10000)
-      const res = await API.post('/api/detect-emotion-multi', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }, signal: controller.signal,
+      const fd = new FormData(); fd.append('file', blob, 'frame.jpg')
+
+      const ctrl = new AbortController()
+      const tid = setTimeout(() => ctrl.abort(), 10000)
+      const res = await API.post('/api/detect-emotion-multi', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }, signal: ctrl.signal,
       })
       clearTimeout(tid)
-      const ts = Math.floor((Date.now() - startTimeRef.current) / 1000)
-      const frameW = video.videoWidth || 640
+
+      const ts = Math.floor((Date.now() - startRef.current) / 1000)
+      setDetections(c => c + 1)
 
       if (res.data && res.data.faces && res.data.faces.length > 0) {
-        const face = res.data.faces[0], bbox = face.bbox || []
-        setCurrentEmotion(face.emotion || 'neutral'); setDetectionCount(c => c + 1)
-        if (bbox.length === 4) {
-          const [bx, by, bw] = bbox
-          if (!baselineFaceRef.current && bw > 30) baselineFaceRef.current = { w: bw, cx: (bx + bw/2) / frameW }
-          const baseline = baselineFaceRef.current || { w: bw, cx: 0.5 }
-          setFaceDistance(`${Math.round((baseline.w * 35) / Math.max(1, bw))}cm`)
-          const widthRatio = bw / Math.max(1, baseline.w)
-          const cx = (bx + bw / 2) / frameW, shiftX = Math.abs(cx - baseline.cx)
-          let region = 'center', penalty = 0
-          if (widthRatio < 0.6) { region = cx < 0.5 ? 'left' : 'right'; penalty = 3 }
-          else if (widthRatio < 0.8) { region = cx < 0.5 ? 'left' : 'right'; penalty = 1.5 }
-          else if (shiftX > 0.12) { region = cx < baseline.cx ? 'left' : 'right'; penalty = 1 }
-          gazeBufferRef.current.push(region)
-          if (gazeBufferRef.current.length > 3) gazeBufferRef.current.shift()
-          const offCount = gazeBufferRef.current.filter(r => r !== 'center').length
-          if (region === 'center') { setCurrentRegion('center'); setFocusScore(s => Math.min(100, s + 0.5)) }
-          else if (offCount >= 2) {
-            setCurrentRegion(region); setFocusScore(s => Math.max(0, s - penalty))
-            const d = widthRatio < 0.8 ? `Head turned ${region} (${Math.round(widthRatio*100)}%)` : `Looking ${region}`
-            setWarnings(w => { const nw = [...w, { time: ts, type: d }]; return nw.length > 30 ? nw.slice(-30) : nw })
-          }
-          setFocusLog(prev => [...prev, { ts, region, wr: Math.round(widthRatio*100) }])
-        }
+        // FACE DETECTED → student is present and facing camera
+        const face = res.data.faces[0]
+        setFacePresent(true)
+        setCurrentEmotion(face.emotion || 'neutral')
+        absenceRef.current = 0
+        setAbsenceStreak(0)
+        setFocusScore(s => Math.min(100, s + 0.5))
+        setFocusLog(prev => [...prev, { ts, status: 'present', emotion: face.emotion }])
       } else {
-        setCurrentEmotion(null); setFaceDistance(null); setDetectionCount(c => c + 1)
-        gazeBufferRef.current.push('absent')
-        if (gazeBufferRef.current.length > 3) gazeBufferRef.current.shift()
-        if (gazeBufferRef.current.filter(r => r === 'absent').length >= 2) {
-          setCurrentRegion('absent'); setFocusScore(s => Math.max(0, s - 3))
-          setWarnings(w => { const nw = [...w, { time: ts, type: 'Face not detected' }]; return nw.length > 30 ? nw.slice(-30) : nw })
+        // FACE NOT DETECTED → student looked away, left, or turned head
+        setFacePresent(false)
+        setCurrentEmotion(null)
+        absenceRef.current += 1
+        const streak = absenceRef.current
+        setAbsenceStreak(streak)
+
+        // Progressive penalty: longer absence = bigger penalty
+        let penalty = 2
+        if (streak >= 3) penalty = 4       // 9+ seconds away
+        if (streak >= 5) penalty = 6       // 15+ seconds away
+
+        setFocusScore(s => Math.max(0, s - penalty))
+        setFocusLog(prev => [...prev, { ts, status: 'absent', emotion: null }])
+
+        if (streak >= 2) {
+          setWarnings(w => {
+            const nw = [...w, { time: ts, type: `Face absent for ${streak * 3}s` }]
+            return nw.length > 30 ? nw.slice(-30) : nw
+          })
         }
-        setFocusLog(prev => [...prev, { ts, region: 'absent', wr: 0 }])
       }
-      if ((Date.now() - lastInteractionRef.current) / 1000 > 30) setFocusScore(s => Math.max(0, s - 1))
     } catch (err) {
-      if (err.name !== 'AbortError') console.error('Exam error:', err)
+      if (err.name !== 'AbortError') console.error('Focus check error:', err)
     } finally { isAnalyzingRef.current = false; setIsProcessing(false) }
   }
 
-  const fmt = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`
-  const total = selectedExam?.questions.length || 0
-  const answered = Object.keys(answers).length
+  const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
 
-  // ════════════════════ SELECT EXAM ════════════════════
+  // ════════════════════ SELECT ════════════════════
   if (phase === 'select') return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6">
       <div className="max-w-2xl w-full space-y-6">
         <div className="text-center mb-8">
           <div className="text-5xl mb-4">🔒</div>
           <h1 className="text-3xl font-black text-white mb-2">EmotiLearn Proctored Exams</h1>
-          <p className="text-gray-400">Select an exam to begin. Camera will be required.</p>
+          <p className="text-gray-400">Select an exam. Your camera will monitor focus during the test.</p>
         </div>
-        {Object.entries(SAMPLE_EXAMS).map(([id, exam]) => (
-          <button key={id} onClick={() => { setSelectedExam(exam); setPhase('info') }}
-            className="w-full text-left bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-blue-500/30 transition-all duration-300 group">
+        {Object.entries(EXAMS).map(([id, ex]) => (
+          <button key={id} onClick={() => { setExamKey(id); setPhase('info') }}
+            className="w-full text-left bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-blue-500/30 transition-all group">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-white font-bold text-lg group-hover:text-blue-400 transition-colors">{exam.title}</h2>
-                <p className="text-gray-400 text-sm mt-1">{exam.description}</p>
+                <div className="text-xs text-blue-400 font-bold uppercase mb-1">{ex.course}</div>
+                <h2 className="text-white font-bold text-lg group-hover:text-blue-400 transition-colors">{ex.title}</h2>
+                <p className="text-gray-400 text-sm mt-1">{ex.desc}</p>
                 <div className="flex gap-4 mt-3 text-xs text-gray-500">
-                  <span>📝 {exam.questions.length} questions</span>
-                  <span>⏱ {Math.floor(exam.timeLimit / 60)} minutes</span>
+                  <span>📝 {ex.qs.length} questions</span>
+                  <span>⏱ {Math.floor(ex.time / 60)} min</span>
                   <span>📹 Proctored</span>
                 </div>
               </div>
-              <div className="text-2xl text-gray-600 group-hover:text-blue-400 transition-colors">→</div>
+              <div className="text-2xl text-gray-600 group-hover:text-blue-400">→</div>
             </div>
           </button>
         ))}
@@ -245,91 +257,89 @@ export default function ExamPage() {
     </div>
   )
 
-  // ════════════════════ EXAM INFO + NAME ════════════════════
+  // ════════════════════ INFO ════════════════════
   if (phase === 'info') return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6">
       <div className="max-w-lg w-full bg-white/5 border border-white/10 rounded-2xl p-8">
         <div className="text-center mb-6">
-          <div className="text-4xl mb-3">📋</div>
-          <h2 className="text-2xl font-black text-white">{selectedExam.title}</h2>
-          <p className="text-gray-400 text-sm mt-2">{selectedExam.description}</p>
+          <div className="text-xs text-blue-400 font-bold uppercase">{exam.course}</div>
+          <h2 className="text-2xl font-black text-white mt-1">{exam.title}</h2>
         </div>
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
-            <div className="text-white font-bold">{selectedExam.questions.length}</div>
-            <div className="text-xs text-gray-500">Questions</div>
-          </div>
-          <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
-            <div className="text-white font-bold">{Math.floor(selectedExam.timeLimit / 60)} min</div>
-            <div className="text-xs text-gray-500">Time Limit</div>
-          </div>
-          <div className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
-            <div className="text-white font-bold">Required</div>
-            <div className="text-xs text-gray-500">Camera</div>
-          </div>
+          {[
+            { v: exam.qs.length, l: 'Questions' },
+            { v: `${Math.floor(exam.time / 60)} min`, l: 'Time Limit' },
+            { v: 'Required', l: 'Camera' },
+          ].map(s => (
+            <div key={s.l} className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
+              <div className="text-white font-bold">{s.v}</div><div className="text-xs text-gray-500">{s.l}</div>
+            </div>
+          ))}
         </div>
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 text-sm text-red-300">
-          ⚠️ <strong>Proctoring Notice:</strong> Your camera will be active during the exam. Head movement, face distance, and interaction timing will be tracked. Ensure your face is clearly visible.
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 text-sm text-red-300 space-y-2">
+          <div>⚠️ <strong>Anti-Cheat Monitoring Active:</strong></div>
+          <div className="text-xs text-red-400 space-y-1 ml-5">
+            <div>• Camera tracks face presence continuously</div>
+            <div>• Looking away for 6+ seconds triggers warnings</div>
+            <div>• Time between answers is monitored (45s+ gap = flagged)</div>
+            <div>• Final report shows focus score + all alerts</div>
+          </div>
         </div>
         <div className="mb-4">
           <label className="text-gray-400 text-sm mb-2 block">Your Full Name</label>
-          <input type="text" value={studentName} onChange={e => setStudentName(e.target.value)} placeholder="Enter your name..."
-            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-600 focus:border-blue-500/50 focus:outline-none transition-all" />
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Enter your name..."
+            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-600 focus:border-blue-500/50 focus:outline-none" />
         </div>
         <div className="flex gap-3">
-          <button onClick={() => setPhase('select')} className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 transition-all">← Back</button>
-          <button onClick={beginExam} disabled={!studentName.trim()}
-            className="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-400 hover:to-rose-400 disabled:opacity-40 transition-all">
-            🔒 Begin Exam
-          </button>
+          <button onClick={() => setPhase('select')} className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10">← Back</button>
+          <button onClick={beginExam} disabled={!name.trim()}
+            className="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-red-500 to-rose-500 text-white disabled:opacity-40">🔒 Begin Exam</button>
         </div>
       </div>
     </div>
   )
 
-  // ════════════════════ EXAM IN PROGRESS ════════════════════
+  // ════════════════════ EXAM ════════════════════
   if (phase === 'exam') {
-    const q = selectedExam.questions[currentQ]
+    const q = exam.qs[currentQ]
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4">
         {/* Top bar */}
-        <div className="flex items-center justify-between mb-4 bg-white/5 rounded-xl px-4 py-3 border border-white/10">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /><span className="text-red-400 font-mono text-sm font-bold">{fmt(duration)}</span></div>
+        <div className="flex items-center justify-between mb-4 bg-white/5 rounded-xl px-4 py-2.5 border border-white/10 text-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /><span className="text-red-400 font-mono font-bold">{fmt(duration)}</span></div>
             <span className="text-gray-600">|</span>
-            <span className="text-gray-400 text-sm">{studentName}</span>
+            <span className="text-gray-400">{name}</span>
             <span className="text-gray-600">|</span>
-            <span className="text-gray-400 text-sm">{answered}/{total} answered</span>
+            <span className="text-gray-400">{answered}/{total} answered</span>
           </div>
           <div className="flex items-center gap-4">
-            <div className={`text-sm font-bold ${timeLeft < 60 ? 'text-red-400 animate-pulse' : 'text-gray-400'}`}>⏱ {fmt(timeLeft)} left</div>
+            <span className={`font-mono font-bold ${timeLeft < 60 ? 'text-red-400 animate-pulse' : 'text-gray-400'}`}>⏱ {fmt(timeLeft)}</span>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold" style={{ color: focusColor(focusScore) }}>Focus: {Math.round(focusScore)}%</span>
-              <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${focusScore}%`, background: focusColor(focusScore) }} />
-              </div>
+              <div className={`w-2.5 h-2.5 rounded-full ${facePresent ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
+              <span className="text-sm font-bold" style={{ color: focusColor(focusScore) }}>{Math.round(focusScore)}%</span>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-4 gap-4">
           {/* Questions — 3 cols */}
-          <div className="col-span-3 space-y-4">
+          <div className="col-span-3">
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-white font-bold text-lg">Question {currentQ + 1} of {total}</h3>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-white font-bold text-lg">Question {currentQ + 1} <span className="text-gray-500 font-normal">of {total}</span></h3>
                 <div className="flex gap-1">
-                  {selectedExam.questions.map((_, i) => (
+                  {exam.qs.map((_, i) => (
                     <button key={i} onClick={() => setCurrentQ(i)}
-                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${i === currentQ ? 'bg-blue-500 text-white' : answers[i] !== undefined ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-white/5 text-gray-500 border border-white/10'}`}>
+                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${i === currentQ ? 'bg-blue-500 text-white' : answers[i] !== undefined ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-white/5 text-gray-600 border border-white/10'}`}>
                       {i + 1}
                     </button>
                   ))}
                 </div>
               </div>
-              <p className="text-gray-200 text-lg mb-6">{q.q}</p>
+              <p className="text-gray-100 text-lg mb-6 leading-relaxed">{q.q}</p>
               <div className="space-y-3">
-                {q.opts.map((opt, i) => (
+                {q.o.map((opt, i) => (
                   <button key={i} onClick={() => selectAnswer(currentQ, i)}
                     className={`w-full text-left px-5 py-4 rounded-xl border transition-all ${answers[currentQ] === i ? 'bg-blue-500/20 border-blue-500/50 text-blue-200' : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'}`}>
                     <div className="flex items-center gap-3">
@@ -343,48 +353,62 @@ export default function ExamPage() {
               </div>
               <div className="flex justify-between mt-6">
                 <button onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0}
-                  className="px-5 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 disabled:opacity-30 transition-all">← Previous</button>
+                  className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 disabled:opacity-30">← Prev</button>
                 {currentQ < total - 1 ? (
                   <button onClick={() => setCurrentQ(currentQ + 1)}
-                    className="px-5 py-2 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 transition-all">Next →</button>
+                    className="px-5 py-2.5 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30">Next →</button>
                 ) : (
                   <button onClick={submitExam} disabled={answered < total}
-                    className="px-6 py-2 rounded-xl font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white disabled:opacity-40 transition-all">✓ Submit ({answered}/{total})</button>
+                    className="px-6 py-2.5 rounded-xl font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white disabled:opacity-40">✓ Submit ({answered}/{total})</button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Camera — 1 col */}
+          {/* Camera panel — 1 col */}
           <div className="space-y-3">
             <div className="bg-white/5 border border-white/10 rounded-2xl p-2">
-              <div className="relative rounded-xl overflow-hidden bg-black aspect-[3/4]">
+              <div className={`relative rounded-xl overflow-hidden bg-black aspect-[3/4] border-2 ${facePresent ? 'border-green-500/30' : 'border-red-500/50'}`}>
                 <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                 <canvas ref={canvasRef} className="hidden" />
                 <div className="absolute top-2 left-2">
-                  <div className={`px-2 py-1 rounded text-[10px] font-bold ${currentRegion === 'center' ? 'bg-green-500/80' : currentRegion === 'absent' ? 'bg-red-500/80' : 'bg-yellow-500/80'} text-white`}>
-                    {currentRegion === 'center' ? '✅' : '⚠️'} {currentRegion}
+                  <div className={`px-2 py-1 rounded text-[10px] font-bold ${facePresent ? 'bg-green-500/80' : 'bg-red-500/80'} text-white`}>
+                    {facePresent ? '✅ Present' : '🔴 Away'}
                   </div>
                 </div>
                 {currentEmotion && <div className="absolute top-2 right-2 px-2 py-1 rounded bg-black/60 text-white text-[10px] font-bold capitalize">{currentEmotion}</div>}
                 <div className="absolute bottom-2 left-2 px-2 py-1 rounded bg-red-500/80 flex items-center gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /><span className="text-white text-[10px] font-bold">REC</span>
                 </div>
-                {faceDistance && <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/60 text-white text-[10px]">📏{faceDistance}</div>}
+                {!facePresent && absenceStreak >= 2 && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-red-900/40">
+                    <div className="text-center">
+                      <div className="text-3xl">⚠️</div>
+                      <div className="text-red-200 text-xs font-bold mt-1">Look at screen!</div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
             <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
               <div className="text-2xl font-black" style={{ color: focusColor(focusScore) }}>{Math.round(focusScore)}%</div>
               <div className="text-[10px] text-gray-500">Focus Score</div>
-              <div className="h-1 bg-white/5 rounded-full overflow-hidden mt-2">
+              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mt-2">
                 <div className="h-full rounded-full transition-all" style={{ width: `${focusScore}%`, background: focusColor(focusScore) }} />
               </div>
             </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs space-y-1.5">
+              <div className="flex justify-between"><span className="text-gray-500">Checks</span><span className="text-white font-bold">{detections}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Absence</span><span className={`font-bold ${absenceStreak > 0 ? 'text-red-400' : 'text-green-400'}`}>{absenceStreak > 0 ? `${absenceStreak * 3}s` : 'None'}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Alerts</span><span className="text-yellow-400 font-bold">{warnings.length}</span></div>
+            </div>
+
             {warnings.length > 0 && (
               <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-2">
-                <div className="text-[10px] text-red-400 font-bold mb-1">⚠️ {warnings.length} alerts</div>
                 <div className="max-h-20 overflow-y-auto space-y-0.5">
-                  {warnings.slice(-4).map((w, i) => <div key={i} className="text-[9px] text-red-300">{fmt(w.time)} {w.type}</div>)}
+                  {warnings.slice(-4).map((w, i) => <div key={i} className="text-[9px] text-red-300">{fmt(w.time)} — {w.type}</div>)}
                 </div>
               </div>
             )}
@@ -395,28 +419,32 @@ export default function ExamPage() {
   }
 
   // ════════════════════ RESULTS ════════════════════
+  const correct = exam.qs.filter((q, i) => answers[i] === q.a).length
+  const examPct = Math.round((correct / total) * 100)
+  const focusedFrames = focusLog.filter(f => f.status === 'present').length
+  const focusPct = focusLog.length > 0 ? Math.round((focusedFrames / focusLog.length) * 100) : 100
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
       <div className="max-w-3xl mx-auto space-y-6">
+        {/* Scores */}
         <div className="text-center bg-white/5 border border-white/10 rounded-2xl p-8">
-          <h2 className="text-2xl font-black text-white mb-2">📋 Exam Results</h2>
-          <p className="text-gray-400 mb-6">{studentName} · {selectedExam.title}</p>
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-white/5 rounded-xl p-5 border border-white/5">
-              <div className="text-4xl font-black" style={{ color: examScore >= 70 ? '#22c55e' : examScore >= 50 ? '#eab308' : '#ef4444' }}>{examScore}%</div>
-              <div className="text-gray-400 text-sm mt-1">Exam Score</div>
-              <div className="text-xs text-gray-500">{Object.entries(answers).filter(([i, a]) => a === selectedExam.questions[parseInt(i)].ans).length}/{total} correct</div>
-            </div>
-            <div className="bg-white/5 rounded-xl p-5 border border-white/5">
-              <div className="text-4xl font-black" style={{ color: focusColor(focusScore) }}>{Math.round(focusScore)}%</div>
-              <div className="text-gray-400 text-sm mt-1">Focus Score</div>
-              <div className="text-xs text-gray-500">{focusScore >= 85 ? 'Excellent' : focusScore >= 70 ? 'Good' : focusScore >= 50 ? 'Moderate' : 'Poor'}</div>
-            </div>
-            <div className="bg-white/5 rounded-xl p-5 border border-white/5">
-              <div className="text-4xl font-black text-white">{fmt(duration)}</div>
-              <div className="text-gray-400 text-sm mt-1">Duration</div>
-              <div className="text-xs text-gray-500">{warnings.length} alerts</div>
-            </div>
+          <div className="text-xs text-blue-400 font-bold uppercase">{exam.course}</div>
+          <h2 className="text-2xl font-black text-white mt-1 mb-2">{exam.title} — Results</h2>
+          <p className="text-gray-400 text-sm mb-6">{name} · Completed in {fmt(duration)}</p>
+          <div className="grid grid-cols-4 gap-4">
+            {[
+              { v: `${examPct}%`, l: 'Exam Score', sub: `${correct}/${total} correct`, c: examPct >= 70 ? '#22c55e' : examPct >= 50 ? '#eab308' : '#ef4444' },
+              { v: `${Math.round(focusScore)}%`, l: 'Focus Score', sub: focusScore >= 85 ? 'Excellent' : focusScore >= 70 ? 'Good' : focusScore >= 50 ? 'Moderate' : 'Poor', c: focusColor(focusScore) },
+              { v: `${focusPct}%`, l: 'Present', sub: `${focusedFrames}/${focusLog.length} checks`, c: focusPct >= 90 ? '#22c55e' : '#eab308' },
+              { v: `${warnings.length}`, l: 'Alerts', sub: `${answerGapWarnings.length} timing flags`, c: warnings.length === 0 ? '#22c55e' : warnings.length <= 3 ? '#eab308' : '#ef4444' },
+            ].map(s => (
+              <div key={s.l} className="bg-white/5 rounded-xl p-4 border border-white/5">
+                <div className="text-3xl font-black" style={{ color: s.c }}>{s.v}</div>
+                <div className="text-gray-400 text-sm mt-1">{s.l}</div>
+                <div className="text-xs text-gray-500">{s.sub}</div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -425,12 +453,30 @@ export default function ExamPage() {
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
             <h3 className="text-white font-bold mb-3">Focus Timeline</h3>
             <div className="flex gap-[1px] h-8 rounded-lg overflow-hidden">
-              {focusLog.map((e, i) => <div key={i} className="flex-1" style={{ background: e.region === 'center' ? '#22c55e' : e.region === 'absent' ? '#ef4444' : '#eab308' }} title={`${fmt(e.ts)} — ${e.region}`} />)}
+              {focusLog.map((e, i) => <div key={i} className="flex-1" style={{ background: e.status === 'present' ? '#22c55e' : '#ef4444' }} title={`${fmt(e.ts)} — ${e.status}`} />)}
             </div>
             <div className="flex justify-between mt-1 text-xs text-gray-600">
               <span>Start</span>
-              <span className="flex gap-3"><span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-sm" />Focused</span><span className="flex items-center gap-1"><span className="w-2 h-2 bg-yellow-500 rounded-sm" />Turned</span><span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-500 rounded-sm" />Away</span></span>
+              <span className="flex gap-3">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-sm" />Present</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-500 rounded-sm" />Away</span>
+              </span>
               <span>End</span>
+            </div>
+          </div>
+        )}
+
+        {/* Answer timing */}
+        {answerGapWarnings.length > 0 && (
+          <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-2xl p-6">
+            <h3 className="text-yellow-400 font-bold mb-3">⏱ Answer Timing Flags</h3>
+            <div className="space-y-2">
+              {answerGapWarnings.map((g, i) => (
+                <div key={i} className="text-sm text-yellow-300 bg-yellow-500/10 rounded-xl px-4 py-2 flex justify-between">
+                  <span>Question {g.q}: {g.gap}s delay before answering</span>
+                  <span className="text-yellow-500 text-xs">{fmt(g.time)}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -439,18 +485,19 @@ export default function ExamPage() {
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="text-white font-bold mb-4">Answer Review</h3>
           <div className="space-y-2">
-            {selectedExam.questions.map((q, i) => {
-              const sel = answers[i], ok = sel === q.ans
+            {exam.qs.map((q, i) => {
+              const sel = answers[i], ok = sel === q.a
               return (
-                <div key={i} className={`rounded-xl p-3 border ${ok ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
-                  <div className="flex items-start gap-2">
-                    <span className={`text-sm font-bold ${ok ? 'text-green-400' : 'text-red-400'}`}>{ok ? '✓' : '✗'}</span>
-                    <div className="flex-1">
-                      <div className="text-gray-200 text-sm">Q{i+1}: {q.q}</div>
-                      <div className="text-xs mt-1">
-                        <span className={ok ? 'text-green-400' : 'text-red-400'}>Your answer: {sel !== undefined ? q.opts[sel] : 'Not answered'}</span>
-                        {!ok && <span className="text-green-400 ml-2">Correct: {q.opts[q.ans]}</span>}
-                      </div>
+                <div key={i} className={`rounded-xl p-3 border flex items-start gap-2 ${ok ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                  <span className={`text-sm font-bold mt-0.5 ${ok ? 'text-green-400' : 'text-red-400'}`}>{ok ? '✓' : '✗'}</span>
+                  <div className="flex-1">
+                    <div className="text-gray-200 text-sm">Q{i + 1}: {q.q}</div>
+                    <div className="text-xs mt-1">
+                      <span className={ok ? 'text-green-400' : 'text-red-400'}>
+                        {sel !== undefined ? q.o[sel] : 'Not answered'}
+                      </span>
+                      {!ok && sel !== undefined && <span className="text-green-400 ml-2">· Correct: {q.o[q.a]}</span>}
+                      {answerTimes[i] && <span className="text-gray-600 ml-2">at {fmt(answerTimes[i])}</span>}
                     </div>
                   </div>
                 </div>
@@ -459,17 +506,18 @@ export default function ExamPage() {
           </div>
         </div>
 
+        {/* Alerts */}
         {warnings.length > 0 && (
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-            <h3 className="text-white font-bold mb-3">⚠️ Proctoring Alerts ({warnings.length})</h3>
-            <div className="space-y-1 max-h-40 overflow-y-auto">
+            <h3 className="text-white font-bold mb-3">⚠️ All Proctoring Alerts ({warnings.length})</h3>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
               {warnings.map((w, i) => <div key={i} className="text-sm text-red-300 bg-red-500/10 rounded-lg px-3 py-2">{fmt(w.time)} — {w.type}</div>)}
             </div>
           </div>
         )}
 
         <div className="text-center">
-          <button onClick={() => { setPhase('select'); setSelectedExam(null); setAnswers({}); setWarnings([]); setFocusLog([]) }}
+          <button onClick={() => { setPhase('select'); setExamKey(null); setAnswers({}); setWarnings([]); setFocusLog([]) }}
             className="px-8 py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 shadow-lg transition-all">← Take Another Exam</button>
         </div>
       </div>
