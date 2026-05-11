@@ -29,10 +29,10 @@ function analyzeGaze(lm) {
 function classifyFocus(g) {
   if (!g) return { status:'absent', pen:3, detail:'Face not detected', color:'#ef4444' }
   const ay=Math.abs(g.yaw), aix=Math.abs(g.irisX)
-  if (ay>0.3) return { status:'head_turned', pen:2.5, detail:`Head ${g.yaw<0?'left':'right'} (${Math.round(ay*100)}%)`, color:'#ef4444' }
-  if (g.irisOk && aix>0.25) return { status:'eyes_sideways', pen:2, detail:`Eyes ${g.irisX<0?'left':'right'}`, color:'#f97316' }
+  if (ay>0.3) return { status:'head_turned', pen:2.5, detail:`Head ${g.yaw<0?'left':'right'}`, color:'#ef4444' }
+  if (g.irisOk && aix>0.35) return { status:'eyes_sideways', pen:2, detail:`Eyes ${g.irisX<0?'left':'right'}`, color:'#f97316' }
   if (ay>0.15) return { status:'slight_turn', pen:1, detail:`Slight ${g.yaw<0?'left':'right'}`, color:'#eab308' }
-  if (g.irisOk && aix>0.15) return { status:'slight_glance', pen:0.5, detail:`Glance ${g.irisX<0?'left':'right'}`, color:'#eab308' }
+  if (g.irisOk && aix>0.25) return { status:'slight_glance', pen:0.5, detail:`Glance ${g.irisX<0?'left':'right'}`, color:'#eab308' }
   return { status:'focused', pen:-0.5, detail:null, color:'#22c55e' }
 }
 
@@ -86,6 +86,7 @@ export default function ExamPage() {
   const vidRef=useRef(null),canRef=useRef(null),strRef=useRef(null)
   const tmrRef=useRef(null),flRef=useRef(null),rafRef=useRef(null),emoRef=useRef(null)
   const t0=useRef(null),lastAns=useRef(null),focusR=useRef(100),fc=useRef(0),lft=useRef(0)
+  const calRef=useRef({samples:[],baseX:0,baseY:0,done:false}) // iris calibration
 
   useEffect(()=>()=>cleanup(),[])
 
@@ -129,6 +130,7 @@ export default function ExamPage() {
     setPhase('loading');setAnswers({});setCurQ(0);setDur(0);setFocus(100);focusR.current=100
     setChecks(0);setWarns([]);setLog([]);setAnsTs({});setGapW([]);setDbg('')
     lastAns.current=null;t0.current=Date.now();fc.current=0
+    calRef.current={samples:[],baseX:0,baseY:0,done:false}
     await new Promise(r=>setTimeout(r,100))
     const ok=await initProctoring()
     if(!ok){alert('Could not start proctoring.');setPhase('info');return}
@@ -136,7 +138,7 @@ export default function ExamPage() {
     const loop=()=>{
       if(!flRef.current||!vidRef.current||vidRef.current.readyState!==4){rafRef.current=requestAnimationFrame(loop);return}
       const now=performance.now()
-      if(now-lft.current<200){rafRef.current=requestAnimationFrame(loop);return}
+      if(now-lft.current<333){rafRef.current=requestAnimationFrame(loop);return}
       lft.current=now
       try{
         const r=flRef.current.detectForVideo(vidRef.current,now)
@@ -144,7 +146,20 @@ export default function ExamPage() {
         fc.current+=1
         const upd=fc.current%3===0
         if(r.faceLandmarks&&r.faceLandmarks.length>0){
-          const gaze=analyzeGaze(r.faceLandmarks[0])
+          const lm=r.faceLandmarks[0]
+          const gaze=analyzeGaze(lm)
+          // Auto-calibrate iris baseline from first 15 frames
+          const cal=calRef.current
+          if(!cal.done&&gaze.irisOk){
+            cal.samples.push({x:gaze.irisX,y:gaze.irisY})
+            if(cal.samples.length>=15){
+              cal.baseX=cal.samples.reduce((s,v)=>s+v.x,0)/cal.samples.length
+              cal.baseY=cal.samples.reduce((s,v)=>s+v.y,0)/cal.samples.length
+              cal.done=true
+            }
+          }
+          // Apply calibration offset
+          if(cal.done){gaze.irisX-=cal.baseX;gaze.irisY-=cal.baseY}
           const cls=classifyFocus(gaze)
           if(cls.pen>0)focusR.current=Math.max(0,focusR.current-cls.pen*0.1)
           else focusR.current=Math.min(100,focusR.current+0.05)
@@ -177,7 +192,7 @@ export default function ExamPage() {
         const d=await resp.json()
         if(d.face_detected&&d.dominant)setEmotion(d.dominant);else setEmotion(null)
       }catch{}
-    },3000)
+    },5000)
   }
 
   const pickAnswer=(qi,oi)=>{
@@ -192,13 +207,13 @@ export default function ExamPage() {
   const submitExam=()=>{clearInterval(tmrRef.current);clearInterval(emoRef.current)
     if(rafRef.current)cancelAnimationFrame(rafRef.current);cleanup();setPhase('results')}
 
-  // Re-attach stream when exam phase video element mounts
+  // Re-attach stream ONCE when exam phase video element mounts
   useEffect(() => {
-    if (phase === 'exam' && strRef.current && vidRef.current) {
+    if (phase === 'exam' && strRef.current && vidRef.current && !vidRef.current.srcObject) {
       vidRef.current.srcObject = strRef.current
       vidRef.current.play().catch(() => {})
     }
-  })
+  }, [phase])
 
   const fmt=s=>`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`
   const total=exam?.qs.length||0,nAns=Object.keys(answers).length
