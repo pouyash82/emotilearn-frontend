@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import GlassCard from '../components/GlassCard'
 import TypingText from '../components/TypingText'
 import SessionReport from '../components/SessionReport'
-import ExamMode from './ExamMode'
 import API from '../api'
 
 const EMOTION_COLORS = {
@@ -19,6 +19,7 @@ const EMOTION_COLORS = {
 
 export default function StudentDashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [tab, setTab] = useState('live')
   const [isSessionActive, setIsSessionActive] = useState(false)
   const [cameraOn, setCameraOn] = useState(false)
@@ -33,6 +34,14 @@ export default function StudentDashboard() {
   const [showReport, setShowReport] = useState(false)
   const [sessionData, setSessionData] = useState(null)
   const [saving, setSaving] = useState(false)
+
+  // ── Courses, Exams, Notifications ──────────────────────────────────
+  const [myCourses, setMyCourses] = useState([])
+  const [availableCourses, setAvailableCourses] = useState([])
+  const [myExams, setMyExams] = useState([])
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [showBrowse, setShowBrowse] = useState(false)
 
   // ── Multimodal state ─────────────────────────────────────────────────
   const [micOn, setMicOn] = useState(false)
@@ -77,6 +86,47 @@ export default function StudentDashboard() {
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current)
     }
   }, [isSessionActive, sessionStartTime])
+
+  // ── Fetch courses, exams, notifications when switching tabs ──────
+  useEffect(() => {
+    if (tab === 'courses') {
+      API.get('/students/courses').then(r => setMyCourses(r.data.courses || [])).catch(() => {})
+      API.get('/students/exams').then(r => setMyExams(r.data.exams || [])).catch(() => {})
+    }
+    if (tab === 'notifs') {
+      API.get('/notifications').then(r => {
+        setNotifications(r.data.notifications || [])
+        setUnreadCount(r.data.unread || 0)
+      }).catch(() => {})
+    }
+  }, [tab])
+
+  // Fetch unread count on mount
+  useEffect(() => {
+    API.get('/notifications').then(r => setUnreadCount(r.data.unread || 0)).catch(() => {})
+  }, [])
+
+  const loadAvailableCourses = () => {
+    API.get('/courses/available').then(r => {
+      setAvailableCourses(r.data.courses || [])
+      setShowBrowse(true)
+    }).catch(() => {})
+  }
+
+  const enrollInCourse = async (courseId) => {
+    try {
+      await API.post(`/courses/${courseId}/enroll`)
+      setShowBrowse(false)
+      API.get('/students/courses').then(r => setMyCourses(r.data.courses || [])).catch(() => {})
+      API.get('/students/exams').then(r => setMyExams(r.data.exams || [])).catch(() => {})
+    } catch (e) { alert(e.response?.data?.detail || 'Enrollment failed') }
+  }
+
+  const markRead = async (id) => {
+    await API.post(`/notifications/${id}/read`).catch(() => {})
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+    setUnreadCount(c => Math.max(0, c - 1))
+  }
 
   const loadStats = async () => {
     try {
@@ -468,7 +518,7 @@ export default function StudentDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-3 mb-6">
-          {[{ id: 'live', label: '🎥 Live Session' }, { id: 'history', label: '📚 History' }, { id: 'exam', label: '🔒 Exam Mode' }].map(t => (
+          {[{ id: 'live', label: '🎥 Live Session' }, { id: 'history', label: '📚 History' }, { id: 'courses', label: '📖 My Courses' }, { id: 'notifs', label: `🔔 ${unreadCount > 0 ? `(${unreadCount})` : ''}` }].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-6 py-3 rounded-2xl font-medium transition-all duration-300 ${tab === t.id ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg' : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'}`}>
               {t.label}
@@ -775,7 +825,138 @@ export default function StudentDashboard() {
           </GlassCard>
         )}
 
-        {tab === 'exam' && <ExamMode />}
+        {/* ═════════ MY COURSES TAB ═════════ */}
+        {tab === 'courses' && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-white">My Courses</h2>
+              <button onClick={loadAvailableCourses}
+                className="px-4 py-2 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 text-sm hover:bg-blue-500/30 transition-all">
+                + Browse & Enroll
+              </button>
+            </div>
+
+            {showBrowse && (
+              <GlassCard className="p-6">
+                <h3 className="text-white font-bold mb-3">Available Courses</h3>
+                {availableCourses.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No courses available</p>
+                ) : (
+                  <div className="space-y-2">
+                    {availableCourses.map(c => (
+                      <div key={c.id} className="flex items-center justify-between bg-white/5 rounded-xl p-3 border border-white/5">
+                        <div>
+                          <div className="text-white font-medium">{c.name}</div>
+                          <div className="text-gray-500 text-xs">by {c.teacher_name}</div>
+                        </div>
+                        {c.enrolled ? (
+                          <span className="text-green-400 text-xs font-bold">✓ Enrolled</span>
+                        ) : (
+                          <button onClick={() => enrollInCourse(c.id)}
+                            className="px-3 py-1 rounded-lg bg-green-500/20 text-green-400 text-xs font-bold hover:bg-green-500/30">Enroll</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button onClick={() => setShowBrowse(false)} className="text-gray-500 text-xs mt-3 hover:text-gray-300">Close</button>
+              </GlassCard>
+            )}
+
+            {myCourses.length === 0 ? (
+              <GlassCard className="p-8 text-center">
+                <div className="text-4xl mb-3">📖</div>
+                <p className="text-gray-400">You're not enrolled in any courses yet.</p>
+                <button onClick={loadAvailableCourses}
+                  className="mt-4 px-6 py-2 rounded-xl bg-blue-500/20 text-blue-400 text-sm hover:bg-blue-500/30">Browse Courses</button>
+              </GlassCard>
+            ) : (
+              myCourses.map(course => {
+                const courseExams = myExams.filter(e => e.course_id === course.id)
+                return (
+                  <GlassCard key={course.id} className="p-6">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="text-white font-bold text-lg">{course.name}</h3>
+                        <p className="text-gray-500 text-xs">by {course.teacher_name}</p>
+                      </div>
+                    </div>
+                    {course.description && <p className="text-gray-400 text-sm mb-4">{course.description}</p>}
+
+                    {courseExams.length === 0 ? (
+                      <p className="text-gray-600 text-sm">No exams posted yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        <h4 className="text-gray-400 text-xs font-bold uppercase">Exams</h4>
+                        {courseExams.map(ex => (
+                          <div key={ex.id} className={`flex items-center justify-between rounded-xl p-3 border ${ex.submitted ? 'bg-green-500/5 border-green-500/10' : 'bg-white/5 border-white/10'}`}>
+                            <div className="flex-1">
+                              <div className="text-white font-medium text-sm flex items-center gap-2">
+                                {ex.is_proctored && <span className="text-red-400 text-[10px]">🔒</span>}
+                                {ex.title}
+                              </div>
+                              <div className="text-gray-500 text-xs mt-0.5">
+                                {ex.question_count} questions · {Math.floor(ex.time_limit / 60)} min
+                                {ex.due_date && <span className="ml-2">Due: {new Date(ex.due_date).toLocaleDateString()}</span>}
+                              </div>
+                            </div>
+                            {ex.submitted ? (
+                              <div className="text-right">
+                                <div className="text-green-400 text-sm font-bold">{ex.score}%</div>
+                                <div className="text-gray-500 text-[10px]">Focus: {ex.focus_score}%</div>
+                              </div>
+                            ) : (
+                              <button onClick={() => navigate(`/exam?id=${ex.id}`)}
+                                className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs font-bold hover:from-red-400 transition-all">
+                                Take Exam →
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </GlassCard>
+                )
+              })
+            )}
+          </div>
+        )}
+
+        {/* ═════════ NOTIFICATIONS TAB ═════════ */}
+        {tab === 'notifs' && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-white">Notifications</h2>
+              {unreadCount > 0 && (
+                <button onClick={() => { API.post('/notifications/read-all').then(() => { setUnreadCount(0); setNotifications(prev => prev.map(n => ({ ...n, is_read: true }))) }).catch(() => {}) }}
+                  className="text-xs text-blue-400 hover:text-blue-300">Mark all read</button>
+              )}
+            </div>
+            {notifications.length === 0 ? (
+              <GlassCard className="p-8 text-center">
+                <div className="text-4xl mb-3">🔔</div>
+                <p className="text-gray-400">No notifications yet</p>
+              </GlassCard>
+            ) : (
+              <div className="space-y-2">
+                {notifications.map(n => (
+                  <GlassCard key={n.id} className={`p-4 cursor-pointer transition-all ${n.is_read ? 'opacity-60' : 'border-l-4 border-l-blue-500'}`}
+                    onClick={() => { markRead(n.id); if (n.link) navigate(n.link) }}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-white font-medium text-sm">{n.title}</div>
+                        <div className="text-gray-400 text-xs mt-1">{n.message}</div>
+                      </div>
+                      <div className="text-gray-600 text-[10px] whitespace-nowrap ml-3">
+                        {n.created_at ? new Date(n.created_at).toLocaleDateString() : ''}
+                      </div>
+                    </div>
+                  </GlassCard>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       {showReport && sessionData && <SessionReport sessionData={sessionData} onClose={() => setShowReport(false)} />}
     </div>

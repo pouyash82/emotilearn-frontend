@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 
 const BACKEND = 'https://web-production-3a26e.up.railway.app'
@@ -65,9 +66,12 @@ const EXAMS = [
 ]
 
 export default function ExamPage() {
-  const [phase,setPhase]=useState('select') // select|info|exam|processing|results
+  const [searchParams] = useSearchParams()
+  const [phase,setPhase]=useState('select')
   const [exam,setExam]=useState(null)
   const [name,setName]=useState('')
+  const [backendMode,setBackendMode]=useState(false)
+  const [backendExamId,setBackendExamId]=useState(null)
 
   // Quiz
   const [answers,setAnswers]=useState({})
@@ -107,6 +111,29 @@ export default function ExamPage() {
   const lastAns=useRef(null)
 
   useEffect(()=>()=>cleanup(),[])
+
+  // Load exam from backend if ?id= is in URL
+  useEffect(()=>{
+    const id = searchParams.get('id')
+    if(!id) return
+    setBackendExamId(parseInt(id))
+    setBackendMode(true)
+    const token = localStorage.getItem('token')
+    fetch(`${BACKEND}/exams/${id}`,{headers:token?{Authorization:`Bearer ${token}`}:{}})
+      .then(r=>r.json()).then(data=>{
+        if(data.questions){
+          setExam({
+            id:data.id, title:data.title, course:data.course_name||'Course',
+            desc:data.description||'', time:data.time_limit||600,
+            qs:data.questions.map(q=>({q:q.q,o:q.o,a:q.a})),
+            is_proctored:data.is_proctored
+          })
+          // Auto-fill student name from localStorage
+          try{const u=JSON.parse(localStorage.getItem('user')||'{}');if(u.name)setName(u.name)}catch{}
+          setPhase('info')
+        }
+      }).catch(()=>{})
+  },[])
 
   // Timer during exam
   useEffect(()=>{
@@ -320,13 +347,24 @@ export default function ExamPage() {
     setProcMsg('Analysis complete!')
 
     // Save to backend
-    try {
-      await fetch(`${BACKEND}/api/exam/end`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({exam_id:`exam_${Date.now()}`})
-      })
-    } catch{}
+    if(backendMode && backendExamId){
+      try {
+        const token = localStorage.getItem('token')
+        await fetch(`${BACKEND}/exams/submit`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json',
+                   ...(token?{Authorization:`Bearer ${token}`}:{})},
+          body:JSON.stringify({
+            exam_id: backendExamId,
+            answers, focus_score: Math.round(focus),
+            focus_log: log, alerts: warns,
+            answer_timing: ansTs,
+            gap_warnings: gapWarns,
+            duration_sec: Math.floor((Date.now()-t0.current)/1000),
+          })
+        })
+      } catch(e){ console.log('Submit save failed:', e) }
+    }
 
     await new Promise(r=>setTimeout(r,500))
     setPhase('results')
