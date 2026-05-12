@@ -4,16 +4,17 @@ import Login            from './pages/Login'
 import Register         from './pages/Register'
 import StudentDashboard from './pages/StudentDashboard'
 import TeacherDashboard from './pages/TeacherDashboard'
+import AdminDashboard   from './pages/AdminDashboard'
 import ProtectedRoute   from './components/ProtectedRoute'
-import ExamPage from './pages/ExamPage'
+import ExamPage         from './pages/ExamPage'
 
 function HomeRedirect() {
   const { user, loading } = useAuth()
   if (loading) return null
   if (!user)   return <Navigate to="/login" replace />
-  return <Navigate to={
-    user.role === 'student' ? '/student' : '/teacher'
-  } replace />
+  if (user.role === 'admin')   return <Navigate to="/admin" replace />
+  if (user.role === 'teacher') return <Navigate to="/teacher" replace />
+  return <Navigate to="/student" replace />
 }
 
 export default function App() {
@@ -33,6 +34,11 @@ export default function App() {
           <Route path="/teacher"  element={
             <ProtectedRoute role="teacher">
               <TeacherDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin"    element={
+            <ProtectedRoute role="admin">
+              <AdminDashboard />
             </ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
