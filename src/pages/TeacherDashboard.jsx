@@ -7,6 +7,8 @@ import LiveClass from './LiveClass'
 import LectureAnalytics from './LectureAnalytics'
 import API from '../api'
 
+const BACKEND = 'https://web-production-3a26e.up.railway.app'
+
 const EMOTION_COLORS = {
   anger    : '#ef4444',
   disgust  : '#a855f7',
@@ -639,6 +641,12 @@ export default function TeacherDashboard() {
                   <div className="bg-white/5 rounded-xl p-3 text-center"><div className="text-2xl font-black" style={{ color: viewingDetail.submission?.score >= 70 ? '#22c55e' : '#ef4444' }}>{viewingDetail.submission?.score}%</div><div className="text-xs text-gray-500">Score</div></div>
                   <div className="bg-white/5 rounded-xl p-3 text-center"><div className="text-2xl font-black" style={{ color: viewingDetail.submission?.focus_score >= 85 ? '#22c55e' : '#eab308' }}>{viewingDetail.submission?.focus_score}%</div><div className="text-xs text-gray-500">Focus</div></div>
                   <div className="bg-white/5 rounded-xl p-3 text-center"><div className="text-2xl font-black text-white">{Math.floor((viewingDetail.submission?.duration_sec||0)/60)}:{((viewingDetail.submission?.duration_sec||0)%60).toString().padStart(2,'0')}</div><div className="text-xs text-gray-500">Duration</div></div>
+                </div>
+                <div className="mb-4">
+                  <a href={`${BACKEND}/api/exam/video/${viewingDetail.submission?.id || 0}`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm hover:bg-blue-500/20 transition-all">
+                    📹 Download Session Recording
+                  </a>
                 </div>
                 {viewingDetail.submission?.focus_log?.length > 0 && (
                   <div className="mb-4"><h4 className="text-gray-400 text-xs font-bold uppercase mb-2">Focus Timeline</h4>

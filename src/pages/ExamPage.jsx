@@ -350,7 +350,7 @@ export default function ExamPage() {
     if(backendMode && backendExamId){
       try {
         const token = localStorage.getItem('token')
-        await fetch(`${BACKEND}/exams/submit`,{
+        const resp = await fetch(`${BACKEND}/exams/submit`,{
           method:'POST',
           headers:{'Content-Type':'application/json',
                    ...(token?{Authorization:`Bearer ${token}`}:{})},
@@ -363,6 +363,16 @@ export default function ExamPage() {
             duration_sec: Math.floor((Date.now()-t0.current)/1000),
           })
         })
+        const subData = await resp.json().catch(()=>({}))
+        // Upload video if submission was saved
+        if(subData.submission_id && chunksRef.current.length > 0){
+          const videoBlob = new Blob(chunksRef.current, {type:'video/webm'})
+          const vfd = new FormData()
+          vfd.append('file', videoBlob, `exam_${subData.submission_id}.webm`)
+          fetch(`${BACKEND}/api/exam/video/${subData.submission_id}`,{
+            method:'POST', body: vfd
+          }).catch(()=>{})
+        }
       } catch(e){ console.log('Submit save failed:', e) }
     }
 
@@ -513,6 +523,8 @@ export default function ExamPage() {
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
               <h3 className="text-white font-bold mb-3">📹 Session Recording</h3>
               <video src={videoUrl} controls className="w-full rounded-xl" />
+              <a href={videoUrl} download={`exam_recording_${Date.now()}.webm`}
+                className="block mt-3 text-center text-sm text-blue-400 hover:text-blue-300">⬇ Download Recording</a>
             </div>)}
           {focusLog.length>0 && (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
