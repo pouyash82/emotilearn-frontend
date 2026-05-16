@@ -5,6 +5,7 @@ import Register         from './pages/Register'
 import StudentDashboard from './pages/StudentDashboard'
 import TeacherDashboard from './pages/TeacherDashboard'
 import AdminDashboard   from './pages/AdminDashboard'
+import ChatPage         from './pages/ChatPage'
 import ProtectedRoute   from './components/ProtectedRoute'
 import ExamPage         from './pages/ExamPage'
 
@@ -39,6 +40,11 @@ export default function App() {
           <Route path="/admin"    element={
             <ProtectedRoute role="admin">
               <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/chat"     element={
+            <ProtectedRoute>
+              <ChatPage />
             </ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
