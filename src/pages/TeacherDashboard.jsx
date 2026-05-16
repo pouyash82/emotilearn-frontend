@@ -5,6 +5,9 @@ import GlassCard from '../components/GlassCard'
 import TypingText from '../components/TypingText'
 import LiveClass from './LiveClass'
 import LectureAnalytics from './LectureAnalytics'
+import EngagementHeatmap from './EngagementHeatmap'
+import AttendanceEngagement from './AttendanceEngagement'
+import StudentProgress from './StudentProgress'
 import API from '../api'
 
 const BACKEND = 'https://web-production-3a26e.up.railway.app'
@@ -227,6 +230,9 @@ export default function TeacherDashboard() {
           {[
             { id: 'overview', label: '📊 Overview' },
             { id: 'live',     label: '🎥 Live Class' },
+            { id: 'heatmap',  label: '🗺️ Heatmap' },
+            { id: 'attendance', label: '📋 Attendance' },
+            { id: 'progress', label: '📈 Progress' },
             { id: 'courses',  label: '📚 Courses' },
             { id: 'students', label: '🎓 Students' },
             { id: 'lecture',  label: '🎬 Lecture Analytics' },
@@ -357,6 +363,15 @@ export default function TeacherDashboard() {
 
         {/* ═════════ LIVE CLASS TAB ═════════ */}
         {tab === 'live' && <LiveClass />}
+
+        {/* ═════════ ENGAGEMENT HEATMAP TAB ═════════ */}
+        {tab === 'heatmap' && <EngagementHeatmap courses={courses} />}
+
+        {/* ═════════ ATTENDANCE + ENGAGEMENT TAB ═════════ */}
+        {tab === 'attendance' && <AttendanceEngagement courses={courses} />}
+
+        {/* ═════════ STUDENT PROGRESS TAB ═════════ */}
+        {tab === 'progress' && <StudentProgress courses={courses} />}
 
         {/* ═════════ COURSES TAB ═════════ */}
         {tab === 'courses' && (
