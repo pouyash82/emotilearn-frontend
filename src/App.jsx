@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Login            from './pages/Login'
 import Register         from './pages/Register'
+import AdminLogin       from './pages/AdminLogin'
 import StudentDashboard from './pages/StudentDashboard'
 import TeacherDashboard from './pages/TeacherDashboard'
 import AdminDashboard   from './pages/AdminDashboard'
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/exam" element={<ExamPage />} />
           <Route path="/"         element={<HomeRedirect />} />
           <Route path="/login"    element={<Login />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/register" element={<Register />} />
           <Route path="/student"  element={
             <ProtectedRoute role="student">
