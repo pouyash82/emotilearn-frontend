@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>EmotiLearn — CCTV Capture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0f172a, #1e1b4b, #0f172a);
+    color: #e2e8f0; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .header {
+    padding: 16px; text-align: center; width: 100%;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .header h1 { font-size: 18px; font-weight: 800; }
+  .header h1 span { background: linear-gradient(90deg, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header p { font-size: 11px; color: #64748b; margin-top: 4px; }
+
+  .video-container {
+    position: relative; width: 100%; max-width: 480px;
+    margin: 12px auto; border-radius: 16px; overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.1);
+    background: #000;
+  }
+  video { width: 100%; display: block; }
+  canvas { display: none; }
+
+  .overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+  }
+  .face-box {
+    position: absolute; border: 2px solid #22c55e;
+    border-radius: 8px; transition: all 0.3s;
+  }
+  .face-label {
+    position: absolute; top: -24px; left: 0;
+    background: rgba(0,0,0,0.8); color: #fff;
+    padding: 2px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+  }
+
+  .controls {
+    width: 100%; max-width: 480px; padding: 12px 16px;
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  }
+  .btn {
+    padding: 10px 20px; border-radius: 12px; border: none;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-start { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; }
+  .btn-stop { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; }
+  .btn-switch { background: rgba(255,255,255,0.1); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .settings {
+    width: 100%; max-width: 480px; padding: 8px 16px;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .settings label { font-size: 11px; color: #64748b; }
+  .settings input, .settings select {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    color: #fff; border-radius: 8px; padding: 6px 10px; font-size: 12px;
+  }
+
+  .stats {
+    width: 100%; max-width: 480px; padding: 12px 16px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px; padding: 12px; text-align: center;
+  }
+  .stat-value { font-size: 20px; font-weight: 800; }
+  .stat-label { font-size: 10px; color: #64748b; margin-top: 2px; }
+
+  .results {
+    width: 100%; max-width: 480px; padding: 8px 16px;
+  }
+  .face-result {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px; padding: 12px; margin-bottom: 8px;
+  }
+  .face-result h4 { font-size: 13px; margin-bottom: 6px; }
+  .emotion-bar {
+    display: flex; align-items: center; gap: 6px; margin: 3px 0;
+  }
+  .emotion-bar .label { font-size: 10px; width: 70px; text-align: right; color: #94a3b8; }
+  .emotion-bar .bar { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+  .emotion-bar .fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+  .emotion-bar .pct { font-size: 10px; width: 35px; font-weight: 700; }
+
+  .status {
+    width: 100%; max-width: 480px; padding: 4px 16px;
+    text-align: center; font-size: 11px; color: #64748b;
+  }
+  .status.active { color: #22c55e; }
+  .status.error { color: #ef4444; }
+
+  .log {
+    width: 100%; max-width: 480px; padding: 8px 16px;
+    max-height: 120px; overflow-y: auto;
+  }
+  .log p { font-size: 10px; color: #475569; padding: 2px 0; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎥 EmotiLearn <span>CCTV Capture</span></h1>
+  <p>Real-time emotion detection — point camera at faces</p>
+</div>
+
+<!-- Server URL -->
+<div class="settings">
+  <label>Server:</label>
+  <input type="text" id="serverUrl" value="http://62.238.6.134:8000" style="flex:1">
+  <label>Interval:</label>
+  <select id="interval">
+    <option value="2000">2s</option>
+    <option value="3000" selected>3s</option>
+    <option value="5000">5s</option>
+  </select>
+</div>
+
+<!-- Video -->
+<div class="video-container">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
+  <div class="overlay" id="overlay"></div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="btn btn-start" id="startBtn" onclick="startCapture()">▶ Start Capture</button>
+  <button class="btn btn-stop" id="stopBtn" onclick="stopCapture()" disabled>⏹ Stop</button>
+  <button class="btn btn-switch" id="switchBtn" onclick="switchCamera()">🔄 Switch Camera</button>
+</div>
+
+<div class="status" id="status">Ready — tap Start to begin</div>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat-card">
+    <div class="stat-value" id="facesCount" style="color:#818cf8">0</div>
+    <div class="stat-label">Faces Detected</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="engagement" style="color:#22c55e">0%</div>
+    <div class="stat-label">Avg Engagement</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="framesProcessed" style="color:#eab308">0</div>
+    <div class="stat-label">Frames Sent</div>
+  </div>
+</div>
+
+<!-- Results -->
+<div class="results" id="results"></div>
+
+<!-- Log -->
+<div class="log" id="log"></div>
+
+<script>
+const EMOTION_COLORS = {
+  anger: '#ef4444', disgust: '#8b5cf6', fear: '#f97316',
+  happiness: '#22c55e', neutral: '#6b7280', sadness: '#3b82f6', surprise: '#eab308',
+};
+const EMOTION_EMOJIS = {
+  anger: '😠', disgust: '🤢', fear: '😨',
+  happiness: '😊', neutral: '😐', sadness: '😢', surprise: '😲',
+};
+
+let video = document.getElementById('video');
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
+let stream = null;
+let captureInterval = null;
+let frameCount = 0;
+let useFront = true;
+
+function log(msg) {
+  const el = document.getElementById('log');
+  const p = document.createElement('p');
+  const now = new Date().toLocaleTimeString();
+  p.textContent = `[${now}] ${msg}`;
+  el.prepend(p);
+  if (el.children.length > 30) el.removeChild(el.lastChild);
+}
+
+function setStatus(msg, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+async function initCamera() {
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: useFront ? 'user' : 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false,
+    });
+    video.srcObject = stream;
+    await video.play();
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    log('Camera initialized (' + (useFront ? 'front' : 'back') + ')');
+    return true;
+  } catch (e) {
+    log('Camera error: ' + e.message);
+    setStatus('Camera access denied', 'error');
+    return false;
+  }
+}
+
+function switchCamera() {
+  useFront = !useFront;
+  initCamera();
+}
+
+async function captureAndSend() {
+  if (!stream) return;
+  const serverUrl = document.getElementById('serverUrl').value.replace(/\/$/, '');
+
+  // Capture frame
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+  const base64 = dataUrl.split(',')[1];
+
+  frameCount++;
+  document.getElementById('framesProcessed').textContent = frameCount;
+  setStatus('Sending frame #' + frameCount + '...', 'active');
+
+  try {
+    const resp = await fetch(serverUrl + '/api/detect-emotion-multi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64 }),
+    });
+
+    if (!resp.ok) throw new Error('Server returned ' + resp.status);
+
+    const data = await resp.json();
+    const faces = data.faces || [];
+
+    document.getElementById('facesCount').textContent = faces.length;
+
+    // Calculate avg engagement
+    if (faces.length > 0) {
+      const avgEng = Math.round(faces.reduce((s, f) => s + (f.engagement_score || 0), 0) / faces.length * 100);
+      document.getElementById('engagement').textContent = avgEng + '%';
+      document.getElementById('engagement').style.color = avgEng >= 65 ? '#22c55e' : avgEng >= 40 ? '#eab308' : '#ef4444';
+    }
+
+    // Render face boxes on overlay
+    const overlay = document.getElementById('overlay');
+    overlay.innerHTML = '';
+    const vw = video.offsetWidth;
+    const vh = video.offsetHeight;
+    const sw = canvas.width;
+    const sh = canvas.height;
+
+    faces.forEach((f, i) => {
+      if (f.box) {
+        const [x, y, w, h] = f.box;
+        const box = document.createElement('div');
+        box.className = 'face-box';
+        box.style.left = (x / sw * vw) + 'px';
+        box.style.top = (y / sh * vh) + 'px';
+        box.style.width = (w / sw * vw) + 'px';
+        box.style.height = (h / sh * vh) + 'px';
+        box.style.borderColor = EMOTION_COLORS[f.dominant_emotion] || '#22c55e';
+
+        const label = document.createElement('div');
+        label.className = 'face-label';
+        label.textContent = (EMOTION_EMOJIS[f.dominant_emotion] || '') + ' ' + (f.dominant_emotion || 'unknown') + ' ' + Math.round((f.engagement_score || 0) * 100) + '%';
+        label.style.background = (EMOTION_COLORS[f.dominant_emotion] || '#333') + 'cc';
+        box.appendChild(label);
+        overlay.appendChild(box);
+      }
+    });
+
+    // Render detailed results
+    const resultsEl = document.getElementById('results');
+    resultsEl.innerHTML = '';
+    faces.forEach((f, i) => {
+      const card = document.createElement('div');
+      card.className = 'face-result';
+
+      let html = `<h4>${EMOTION_EMOJIS[f.dominant_emotion] || '👤'} Face ${i + 1} — ${f.dominant_emotion || 'unknown'} (${Math.round((f.confidence || 0) * 100)}%)</h4>`;
+
+      const scores = f.scores || {};
+      const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+      sorted.forEach(([emo, score]) => {
+        const pct = Math.round(score * 100);
+        const color = EMOTION_COLORS[emo] || '#6b7280';
+        html += `
+          <div class="emotion-bar">
+            <div class="label">${EMOTION_EMOJIS[emo] || ''} ${emo}</div>
+            <div class="bar"><div class="fill" style="width:${pct}%;background:${color}"></div></div>
+            <div class="pct" style="color:${color}">${pct}%</div>
+          </div>`;
+      });
+      card.innerHTML = html;
+      resultsEl.appendChild(card);
+    });
+
+    log(`Frame #${frameCount}: ${faces.length} face(s) detected`);
+    setStatus(`✅ ${faces.length} face(s) detected — streaming`, 'active');
+
+  } catch (e) {
+    log('Error: ' + e.message);
+    setStatus('⚠️ ' + e.message, 'error');
+  }
+}
+
+async function startCapture() {
+  const ok = await initCamera();
+  if (!ok) return;
+
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+
+  const interval = parseInt(document.getElementById('interval').value);
+  captureInterval = setInterval(captureAndSend, interval);
+  captureAndSend(); // immediate first capture
+  setStatus('Capturing...', 'active');
+  log('Capture started (every ' + (interval / 1000) + 's)');
+}
+
+function stopCapture() {
+  if (captureInterval) clearInterval(captureInterval);
+  captureInterval = null;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  video.srcObject = null;
+
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = true;
+  document.getElementById('overlay').innerHTML = '';
+
+  setStatus('Stopped', '');
+  log('Capture stopped');
+}
+
+// Auto-init camera on load
+window.addEventListener('load', () => { initCamera(); });
+</script>
+</body>
+</html>
