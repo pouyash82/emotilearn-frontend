@@ -691,6 +691,9 @@ export default function TeacherDashboard() {
           </div>
         </div>
       )}
+
+      {/* Chat button - always visible */}
+      <ChatButton />
     </div>
   )
 }
