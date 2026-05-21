@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import GlassCard from '../components/GlassCard'
+import ChatButton from '../components/ChatButton'
 import API from '../api'
 
 const engColor = (v) => v >= 65 ? '#22c55e' : v >= 40 ? '#eab308' : '#ef4444'
@@ -682,6 +683,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        <ChatButton />
       </div>
     </div>
   )

@@ -6,6 +6,7 @@ import GlassCard from '../components/GlassCard'
 import TypingText from '../components/TypingText'
 import SessionReport from '../components/SessionReport'
 import CompareWithClass from '../components/CompareWithClass'
+import ChatButton from '../components/ChatButton'
 import API from '../api'
 
 const EMOTION_COLORS = {
@@ -963,6 +964,7 @@ export default function StudentDashboard() {
         )}
       </div>
       {showReport && sessionData && <SessionReport sessionData={sessionData} onClose={() => setShowReport(false)} />}
+      <ChatButton />
     </div>
   )
 }

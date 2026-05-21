@@ -8,6 +8,7 @@ import LectureAnalytics from './LectureAnalytics'
 import EngagementHeatmap from './EngagementHeatmap'
 import AttendanceEngagement from './AttendanceEngagement'
 import StudentProgress from './StudentProgress'
+import ChatButton from '../components/ChatButton'
 import API from '../api'
 
 const BACKEND = 'https://web-production-3a26e.up.railway.app'
@@ -969,6 +970,7 @@ function StudentAnalyticsModal({ student, onClose }) {
             )}
           </div>
         </div>
+        <ChatButton />
       </div>
     </div>
   )
