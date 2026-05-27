@@ -231,18 +231,20 @@ async function captureAndSend() {
 
   // Capture frame
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-  const base64 = dataUrl.split(',')[1];
 
   frameCount++;
   document.getElementById('framesProcessed').textContent = frameCount;
   setStatus('Sending frame #' + frameCount + '...', 'active');
 
   try {
+    // Convert canvas to Blob (file), then send as multipart/form-data
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7));
+    const formData = new FormData();
+    formData.append('file', blob, 'frame.jpg');
+
     const resp = await fetch(serverUrl + '/api/detect-emotion-multi', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64 }),
+      body: formData,
     });
 
     if (!resp.ok) throw new Error('Server returned ' + resp.status);
