@@ -21,7 +21,8 @@ export default function Login() {
     try {
       const res = await API.post('/auth/login', { email, password })
       login(res.data.user, res.data.access_token)
-      navigate(res.data.user.role === 'teacher' ? '/teacher' : '/student')
+      const r = res.data.user.role
+      navigate(r === 'teacher' ? '/teacher' : r === 'admin' ? '/admin' : '/student')
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed')
     } finally {
