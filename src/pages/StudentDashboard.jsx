@@ -55,6 +55,10 @@ export default function StudentDashboard() {
   const [textEmotion, setTextEmotion] = useState(null)
   const [transcribing, setTranscribing] = useState(false)
   const [voiceEmotion, setVoiceEmotion] = useState(null)
+  const [detectionMode, setDetectionMode] = useState('single') // 'single' or 'multi'
+  const [faces, setFaces] = useState([])
+  const [classEng, setClassEng] = useState(0)
+  const [multiProfile, setMultiProfile] = useState(null)
 
   const emotionHistoryRef = useRef([])
   const detectionCountRef = useRef(0)
@@ -142,9 +146,9 @@ export default function StudentDashboard() {
 
   const startSession = async () => {
     const ok = await startWebcam(); if (!ok) return
-    emotionHistoryRef.current = []; detectionCountRef.current = 0; setSessionStartTime(Date.now()); setSessionDuration(0); setIsSessionActive(true); setCurrentEmotion(null); setEmotionScores({}); setEngagement(0); setTranscription(''); setTextEmotion(null); setTranscribing(false); allTranscriptsRef.current = []; allAudioBlobsRef.current = []
-    try { await API.post('/session/start') } catch {}
-    intervalRef.current = setInterval(captureAndAnalyze, 3000); setTimeout(captureAndAnalyze, 500)
+    emotionHistoryRef.current = []; detectionCountRef.current = 0; setSessionStartTime(Date.now()); setSessionDuration(0); setIsSessionActive(true); setCurrentEmotion(null); setEmotionScores({}); setEngagement(0); setTranscription(''); setTextEmotion(null); setTranscribing(false); allTranscriptsRef.current = []; allAudioBlobsRef.current = []; setFaces([]); setClassEng(0); setMultiProfile(null)
+    try { await API.post(detectionMode === 'multi' ? '/session/multi/start' : '/session/start') } catch {}
+    intervalRef.current = setInterval(captureAndAnalyze, detectionMode === 'multi' ? 1200 : 3000); setTimeout(captureAndAnalyze, 500)
   }
 
   const stopSession = async () => {
@@ -166,13 +170,22 @@ export default function StudentDashboard() {
     setSessionData({ duration: sessionDuration, totalDetections: total, emotionHistory: history, avgEngagement: avgEng, transcription: allTranscriptsRef.current.join(' '), textEmotion, voiceEmotion })
     if (total > 0) { setSaving(true); try { await API.post('/sessions/save', { lecture_id: null, avg_engagement: avgEng, overall_engagement: avgEng, dominant_emotion: dominant, total_detections: total, unique_emotions: uniqueCount, distribution, emotion_logs: history.map(h => ({ time: h.time || new Date().toISOString(), emotion: h.emotion, confidence: (h.confidence || 0) / 100, source: h.source || 'vision', scores: Object.fromEntries(Object.entries(h.scores || {}).map(([k, v]) => [k, (v || 0) / 100])), engagement_score: (h.engagement_score || 0) / 100 })) }) } catch {}; setSaving(false) }
     try { await API.post('/session/end', { duration: sessionDuration, detections: total, avgEngagement: avgEng }) } catch {}
+    if (detectionMode === 'multi') { try { const mp = await API.get('/session/multi/profile'); setMultiProfile(mp.data) } catch {} }
     setShowReport(true); loadStats(); loadSessions()
   }
 
   const captureAndAnalyze = async () => {
     if (isAnalyzingRef.current || !videoRef.current || !canvasRef.current) return; const video = videoRef.current; const canvas = canvasRef.current; if (video.readyState !== 4) return
     isAnalyzingRef.current = true; setIsProcessing(true)
-    try { const ctx = canvas.getContext('2d'); canvas.width = video.videoWidth; canvas.height = video.videoHeight; ctx.drawImage(video, 0, 0); const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8)); const fd = new FormData(); fd.append('file', blob, 'frame.jpg'); const controller = new AbortController(); const tid = setTimeout(() => controller.abort(), 15000); const res = await API.post('/api/detect-emotion', fd, { headers: { 'Content-Type': 'multipart/form-data' }, signal: controller.signal }); clearTimeout(tid); if (res.data) { const { dominant, confidence, emotions, engagement: eng } = res.data; setCurrentEmotion(dominant); setEmotionScores(emotions || {}); setEngagement(eng || confidence || 50); detectionCountRef.current += 1; emotionHistoryRef.current.push({ time: new Date().toISOString(), timestamp: sessionDuration, emotion: dominant, confidence: confidence || 50, scores: emotions || {}, engagement_score: eng || 0, source: 'vision' }) } }
+    try { const ctx = canvas.getContext('2d'); canvas.width = video.videoWidth; canvas.height = video.videoHeight; ctx.drawImage(video, 0, 0); const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8)); const fd = new FormData(); fd.append('file', blob, 'frame.jpg'); const controller = new AbortController(); const tid = setTimeout(() => controller.abort(), 15000)
+      if (detectionMode === 'multi') {
+        const res = await API.post('/api/detect-emotion-multi', fd, { headers: { 'Content-Type': 'multipart/form-data' }, signal: controller.signal }); clearTimeout(tid)
+        if (res.data && res.data.success) { setFaces(res.data.faces || []); setClassEng(res.data.class_engagement || 0); const ff = res.data.faces || []; if (ff.length > 0) { const top = ff[0]; setCurrentEmotion(top.emotion); setEngagement(res.data.class_engagement || 0); detectionCountRef.current += 1; emotionHistoryRef.current.push({ time: new Date().toISOString(), timestamp: sessionDuration, emotion: top.emotion, confidence: top.confidence || 50, scores: {}, engagement_score: res.data.class_engagement || 0, source: 'vision-multi', face_count: ff.length }) } }
+        else { setFaces([]); setClassEng(0) }
+      } else {
+        const res = await API.post('/api/detect-emotion', fd, { headers: { 'Content-Type': 'multipart/form-data' }, signal: controller.signal }); clearTimeout(tid); if (res.data) { const { dominant, confidence, emotions, engagement: eng } = res.data; setCurrentEmotion(dominant); setEmotionScores(emotions || {}); setEngagement(eng || confidence || 50); detectionCountRef.current += 1; emotionHistoryRef.current.push({ time: new Date().toISOString(), timestamp: sessionDuration, emotion: dominant, confidence: confidence || 50, scores: emotions || {}, engagement_score: eng || 0, source: 'vision' }) }
+      }
+    }
     catch {} finally { isAnalyzingRef.current = false; setIsProcessing(false) }
   }
 
@@ -333,6 +346,23 @@ export default function StudentDashboard() {
             ) : (
               <button onClick={stopSession} disabled={saving} className="btn-danger flex items-center gap-2 px-6 py-3"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Stop Session</button>
             )}
+            {/* Detection Mode Toggle */}
+            {!isSessionActive && (
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl p-1">
+                <button onClick={() => setDetectionMode('single')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${detectionMode === 'single' ? 'bg-white text-indigo-600 border border-indigo-200 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  <span className="flex items-center gap-1.5"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>Single Face</span>
+                </button>
+                <button onClick={() => setDetectionMode('multi')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${detectionMode === 'multi' ? 'bg-white text-indigo-600 border border-indigo-200 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  <span className="flex items-center gap-1.5"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Multi-Face</span>
+                </button>
+              </div>
+            )}
+            {isSessionActive && detectionMode === 'multi' && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span className="text-amber-700 text-xs font-medium">Multi-face · {faces.length} detected</span>
+              </div>
+            )}
             {saving && <div className="flex items-center gap-2 text-amber-600 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm"><div className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin" /> Saving...</div>}
             {transcribing && <div className="flex items-center gap-2 text-indigo-600 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm"><div className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" /> Transcribing...</div>}
             <div className="flex items-center gap-4 ml-auto">
@@ -366,6 +396,14 @@ export default function StudentDashboard() {
                   </div>
                 )}
                 {micOn && <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-md bg-indigo-500 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse-soft" /><span className="text-white text-[10px] font-medium">Voice</span></div>}
+                {/* Multi-face bounding box overlay */}
+                {detectionMode === 'multi' && cameraOn && faces.length > 0 && videoRef.current && (
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={`0 0 ${videoRef.current.videoWidth || 640} ${videoRef.current.videoHeight || 480}`} preserveAspectRatio="xMidYMid slice">
+                    {faces.map((f) => { const [x, y, w, h] = f.bbox; const color = f.engagement >= 65 ? '#22c55e' : f.engagement >= 40 ? '#eab308' : '#ef4444'; return (
+                      <g key={f.face_id}><rect x={x} y={y} width={w} height={h} stroke={color} strokeWidth="3" fill="none" rx="6" /><rect x={x} y={Math.max(0, y - 26)} width={Math.min(w, 180)} height="22" fill={color} /><text x={x + 6} y={Math.max(16, y - 10)} fill="white" fontSize="14" fontWeight="bold">#{f.face_id} {f.emotion.toUpperCase()} · {Math.round(f.engagement)}%</text></g>
+                    )})}
+                  </svg>
+                )}
               </div>
               {currentEmotion && (
                 <div className="space-y-1.5">
@@ -428,6 +466,68 @@ export default function StudentDashboard() {
               )}
             </GlassCard>
           </div>
+
+          {/* Multi-face per-student cards */}
+          {detectionMode === 'multi' && isSessionActive && faces.length > 0 && (
+            <GlassCard className="p-5">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                Per-Face Tracking <span className="text-xs font-normal text-gray-400 ml-1">({faces.length} detected)</span>
+              </h3>
+              <div className={`grid gap-3 ${faces.length <= 2 ? 'grid-cols-2' : faces.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+                {faces.map((f) => { const color = f.engagement >= 65 ? '#22c55e' : f.engagement >= 40 ? '#eab308' : '#ef4444'; return (
+                  <div key={f.face_id} className="bg-gray-50 border border-gray-100 rounded-xl p-4 hover:bg-gray-100 transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-slate-700 font-bold text-sm">Face #{f.face_id}</span>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}>{f.engagement >= 65 ? 'High' : f.engagement >= 40 ? 'Medium' : 'Low'}</span>
+                    </div>
+                    <div className="text-center mb-2">
+                      <div className="text-2xl mb-0.5">{{'anger':'😠','disgust':'🤢','fear':'😨','happiness':'😊','neutral':'😐','sadness':'😢','surprise':'😲'}[f.emotion] || '😐'}</div>
+                      <div className="text-xs font-bold capitalize" style={{ color: EMOTION_COLORS[f.emotion]?.hex || '#6b7280' }}>{f.emotion}</div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-400 mb-1"><span>Engagement</span><span style={{ color }}>{Math.round(f.engagement)}%</span></div>
+                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, f.engagement)}%`, background: color }} /></div>
+                  </div>
+                )})}
+              </div>
+            </GlassCard>
+          )}
+
+          {/* Multi-face class engagement summary */}
+          {detectionMode === 'multi' && isSessionActive && (
+            <GlassCard className="p-5">
+              <div className="flex items-center justify-between">
+                <div><h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Class Engagement</h3><p className="text-xs text-gray-400 mt-0.5">{faces.length} faces in frame</p></div>
+                <div className="text-right"><div className="text-3xl font-bold" style={{ color: classEng >= 65 ? '#22c55e' : classEng >= 40 ? '#eab308' : '#ef4444' }}>{Math.round(classEng)}%</div><div className="text-xs text-gray-400">{classEng >= 65 ? 'High' : classEng >= 40 ? 'Medium' : 'Low'} engagement</div></div>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden mt-3"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, classEng)}%`, background: classEng >= 65 ? '#22c55e' : classEng >= 40 ? '#eab308' : '#ef4444' }} /></div>
+            </GlassCard>
+          )}
+
+          {/* Multi-face post-session summary */}
+          {detectionMode === 'multi' && !isSessionActive && multiProfile && multiProfile.faces?.length > 0 && (
+            <GlassCard className="p-5">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                Multi-Face Session Summary
+              </h3>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100"><div className="text-2xl font-bold text-slate-700">{multiProfile.face_count}</div><div className="text-xs text-gray-400 mt-0.5">Faces Tracked</div></div>
+                <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100"><div className="text-2xl font-bold" style={{ color: engColor(multiProfile.class_avg_engagement) }}>{multiProfile.class_avg_engagement}%</div><div className="text-xs text-gray-400 mt-0.5">Class Avg</div></div>
+                <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100"><div className="text-2xl font-bold text-slate-700">{multiProfile.faces.reduce((sum, f) => sum + f.total_detections, 0)}</div><div className="text-xs text-gray-400 mt-0.5">Total Detections</div></div>
+              </div>
+              <div className="space-y-2">
+                {multiProfile.faces.map((f) => (
+                  <div key={f.face_id} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 border border-amber-200 flex items-center justify-center text-amber-700 font-bold text-sm flex-shrink-0">#{f.face_id}</div>
+                    <div className="flex-1"><div className="text-sm text-slate-700 font-medium">Face #{f.face_id}</div><div className="text-xs text-gray-400 capitalize">Dominant: {f.dominant_emotion} · {f.total_detections} detections</div></div>
+                    <div className="text-right"><div className="text-sm font-bold" style={{ color: engColor(f.avg_engagement) }}>{f.avg_engagement}%</div><div className="text-[10px] text-gray-400">{f.engagement_label}</div></div>
+                    <div className="w-24 flex-shrink-0"><div className="h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${f.avg_engagement}%`, background: engColor(f.avg_engagement) }} /></div></div>
+                  </div>
+                ))}
+              </div>
+            </GlassCard>
+          )}
         </div>
       )}
 

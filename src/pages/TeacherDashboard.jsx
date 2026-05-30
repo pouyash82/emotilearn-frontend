@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import DashboardLayout from '../components/DashboardLayout'
 import GlassCard from '../components/GlassCard'
-import LiveClass from './LiveClass'
 import LectureAnalytics from './LectureAnalytics'
 import EngagementHeatmap from './EngagementHeatmap'
 import AttendanceEngagement from './AttendanceEngagement'
@@ -67,13 +66,12 @@ export default function TeacherDashboard() {
 
   /* ── Map sidebar tabs to sub-views ── */
   const analyticsSubTabs = [
-    { id: 'live', label: 'Live Class' },
     { id: 'heatmap', label: 'Heatmap' },
     { id: 'attendance', label: 'Attendance' },
     { id: 'progress', label: 'Progress' },
     { id: 'lecture', label: 'Lecture' },
   ]
-  const [analyticsSubTab, setAnalyticsSubTab] = useState('live')
+  const [analyticsSubTab, setAnalyticsSubTab] = useState('heatmap')
 
   return (
     <DashboardLayout activeTab={tab} onTabChange={setTab} title={`Dashboard / ${user?.name || 'Teacher'}`}
@@ -102,7 +100,7 @@ export default function TeacherDashboard() {
               <div className="text-center py-8">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" className="mx-auto mb-3"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
                 <p className="text-gray-500 mb-3">No student data yet</p>
-                <button onClick={() => { setTab('analytics'); setAnalyticsSubTab('live') }} className="btn-primary text-sm px-5 py-2">Start a Live Class</button>
+                <button onClick={() => { setTab('analytics'); setAnalyticsSubTab('heatmap') }} className="btn-primary text-sm px-5 py-2">View Analytics</button>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-5">
@@ -150,7 +148,7 @@ export default function TeacherDashboard() {
           {/* Quick actions */}
           <div className="grid grid-cols-4 gap-3">
             {[
-              { label: 'Live Class', icon: 'M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m-2.828 9.9a9 9 0 010-12.728', action: () => { setTab('analytics'); setAnalyticsSubTab('live') } },
+              { label: 'Analytics', icon: 'M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m-2.828 9.9a9 9 0 010-12.728', action: () => { setTab('analytics'); setAnalyticsSubTab('heatmap') } },
               { label: 'Create Course', icon: 'M12 4v16m8-8H4', action: () => setTab('courses') },
               { label: 'View Students', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2', action: () => setTab('students') },
               { label: 'Exams', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', action: () => setTab('exams') },
@@ -298,7 +296,6 @@ export default function TeacherDashboard() {
               </button>
             ))}
           </div>
-          {analyticsSubTab === 'live' && <LiveClass />}
           {analyticsSubTab === 'heatmap' && <EngagementHeatmap courses={courses} />}
           {analyticsSubTab === 'attendance' && <AttendanceEngagement courses={courses} />}
           {analyticsSubTab === 'progress' && <StudentProgress courses={courses} />}
