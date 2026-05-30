@@ -30,6 +30,11 @@ export default function AdminDashboard() {
   const [bulkEnrollEmails, setBulkEnrollEmails] = useState('')
   const [bulkEnrollCourse, setBulkEnrollCourse] = useState('')
   const [annForm, setAnnForm] = useState({ title: '', content: '', priority: 'normal', target_role: '' })
+  const [smtpStatus, setSmtpStatus] = useState(null)
+  const [smtpTestEmail, setSmtpTestEmail] = useState('')
+  const [smtpSending, setSmtpSending] = useState(false)
+  const [smtpResult, setSmtpResult] = useState(null)
+  const [bulkEmailForm, setBulkEmailForm] = useState({ subject: '', message: '', target_role: '' })
 
   // Sub-tab for stats view
   const [statsSubTab, setStatsSubTab] = useState('institution')
@@ -45,7 +50,7 @@ export default function AdminDashboard() {
       if (statsSubTab === 'retention') loadRetention()
       if (statsSubTab === 'audit') loadAuditLogs()
       if (statsSubTab === 'announcements') loadAnnouncements()
-      if (statsSubTab === 'integrations') loadIntegrations()
+      if (statsSubTab === 'integrations') { loadIntegrations(); loadSmtpStatus() }
     }
   }, [tab, statsSubTab])
 
@@ -60,6 +65,9 @@ export default function AdminDashboard() {
   const loadRetention = () => API.get('/admin/retention/stats').then(r => setRetention(r.data)).catch(() => {})
   const loadInstitution = () => API.get('/admin/analytics/institution').then(r => setInstitution(r.data)).catch(() => {})
   const loadIntegrations = () => API.get('/admin/integrations').then(r => setIntegrations(r.data.integrations || [])).catch(() => {})
+  const loadSmtpStatus = () => API.get('/admin/smtp/status').then(r => setSmtpStatus(r.data)).catch(() => setSmtpStatus(null))
+  const smtpTest = async () => { if (!smtpTestEmail) return; setSmtpSending(true); setSmtpResult(null); try { const r = await API.post('/admin/smtp/test', { to: smtpTestEmail }); setSmtpResult(r.data) } catch (e) { setSmtpResult({ success: false, error: e.response?.data?.detail || 'Failed' }) }; setSmtpSending(false) }
+  const smtpBulkSend = async () => { if (!bulkEmailForm.subject) return; setSmtpSending(true); try { const r = await API.post('/admin/smtp/send-bulk', { ...bulkEmailForm, target_role: bulkEmailForm.target_role || null }); setSmtpResult(r.data); setBulkEmailForm({ subject: '', message: '', target_role: '' }) } catch (e) { setSmtpResult({ success: false, error: e.response?.data?.detail || 'Failed' }) }; setSmtpSending(false) }
   const loadStreams = () => API.get('/admin/streams').then(r => setStreams(r.data.streams || {})).catch(() => {})
 
   const toggleRole = async (uid, role) => { await API.put(`/admin/users/${uid}/role`, { role }).catch(() => {}); loadUsers() }
@@ -355,17 +363,99 @@ export default function AdminDashboard() {
 
           {/* Integrations */}
           {statsSubTab === 'integrations' && (
-            <div className="grid grid-cols-2 gap-3">
-              {integrations.map(i => (
-                <GlassCard key={i.name} className="p-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-slate-800 font-semibold text-sm">{i.name}</h4>
-                    <span className={`badge ${i.status==='connected'?'badge-success':'badge-info'}`}>{i.status==='connected'?'Connected':'Not Connected'}</span>
+            <div className="space-y-4">
+              {/* SMTP Email — Full Integration */}
+              <GlassCard className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="text-slate-800 font-semibold">SMTP Email</h4>
+                    <p className="text-gray-400 text-xs mt-0.5">Send session reports, alerts, and notifications via email</p>
                   </div>
-                  <p className="text-gray-500 text-xs mb-3">{i.description}</p>
-                  <button className="btn-secondary text-xs px-3 py-1.5 opacity-50 cursor-not-allowed">Coming Soon</button>
-                </GlassCard>
-              ))}
+                  <span className={`badge ${smtpStatus?.configured ? 'badge-success' : 'badge-danger'}`}>
+                    {smtpStatus?.configured ? 'Connected' : 'Not Configured'}
+                  </span>
+                </div>
+
+                {smtpStatus?.configured ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-4 gap-3">
+                      {[
+                        { l: 'Host', v: smtpStatus.host },
+                        { l: 'Port', v: smtpStatus.port },
+                        { l: 'User', v: smtpStatus.user },
+                        { l: 'TLS', v: smtpStatus.use_tls ? 'Enabled' : 'Disabled' },
+                      ].map(s => (
+                        <div key={s.l} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                          <div className="text-[10px] text-gray-400 uppercase tracking-wider">{s.l}</div>
+                          <div className="text-sm text-slate-700 font-medium mt-0.5 truncate">{s.v}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Test email */}
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Send Test Email</div>
+                      <div className="flex gap-2">
+                        <input type="email" value={smtpTestEmail} onChange={e => setSmtpTestEmail(e.target.value)} placeholder="recipient@example.com" className="input-glass flex-1 text-sm py-2" />
+                        <button onClick={smtpTest} disabled={smtpSending || !smtpTestEmail} className="btn-primary text-xs px-4 py-2 disabled:opacity-40">
+                          {smtpSending ? 'Sending...' : 'Send Test'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bulk email */}
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Send Bulk Notification</div>
+                      <div className="space-y-2">
+                        <input type="text" value={bulkEmailForm.subject} onChange={e => setBulkEmailForm({...bulkEmailForm, subject: e.target.value})} placeholder="Email subject" className="input-glass text-sm py-2" />
+                        <textarea value={bulkEmailForm.message} onChange={e => setBulkEmailForm({...bulkEmailForm, message: e.target.value})} placeholder="Message content" rows={3} className="w-full input-glass text-sm resize-none" />
+                        <div className="flex gap-2">
+                          <select value={bulkEmailForm.target_role} onChange={e => setBulkEmailForm({...bulkEmailForm, target_role: e.target.value})} className="input-glass text-xs w-auto py-2">
+                            <option value="">All Users</option>
+                            <option value="student">Students Only</option>
+                            <option value="teacher">Teachers Only</option>
+                          </select>
+                          <button onClick={smtpBulkSend} disabled={smtpSending || !bulkEmailForm.subject} className="btn-primary text-xs px-4 py-2 disabled:opacity-40">
+                            {smtpSending ? 'Sending...' : 'Send to All'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {smtpResult && (
+                      <div className={`px-4 py-3 rounded-xl text-sm ${smtpResult.success || smtpResult.sent !== undefined ? 'bg-green-50 border border-green-200 text-green-600' : 'bg-red-50 border border-red-200 text-red-500'}`}>
+                        {smtpResult.success ? 'Email sent successfully!' : smtpResult.sent !== undefined ? `Sent: ${smtpResult.sent}, Failed: ${smtpResult.failed}` : `Error: ${smtpResult.error}`}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+                    <p className="font-semibold mb-1">Setup Required</p>
+                    <p className="text-xs text-amber-600">Add these environment variables in Railway:</p>
+                    <code className="block mt-2 text-xs bg-white rounded-lg p-3 border border-amber-100 text-slate-600 font-mono">
+                      SMTP_HOST=smtp.gmail.com<br/>
+                      SMTP_PORT=587<br/>
+                      SMTP_USER=your@gmail.com<br/>
+                      SMTP_PASSWORD=your_app_password<br/>
+                      SMTP_FROM=your@gmail.com
+                    </code>
+                  </div>
+                )}
+              </GlassCard>
+
+              {/* Other integrations — future */}
+              <div className="grid grid-cols-3 gap-3">
+                {integrations.filter(i => i.name !== 'SMTP Email').map(i => (
+                  <GlassCard key={i.name} className="p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-slate-800 font-semibold text-sm">{i.name}</h4>
+                      <span className="badge badge-info">Planned</span>
+                    </div>
+                    <p className="text-gray-400 text-xs mb-3">{i.description}</p>
+                    <button className="btn-secondary text-xs px-3 py-1.5 opacity-50 cursor-not-allowed">Coming Soon</button>
+                  </GlassCard>
+                ))}
+              </div>
             </div>
           )}
         </div>
