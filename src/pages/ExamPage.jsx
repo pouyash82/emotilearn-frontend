@@ -225,19 +225,19 @@ export default function ExamPage() {
       <div className="fixed inset-0 bg-gradient-to-br from-base via-surface/60 to-base z-0" />
       <div className="max-w-2xl w-full space-y-4 relative z-10 animate-fade-in-up">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-rose-500 shadow-lg shadow-red-500/20 mb-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-rose-500 shadow-lg shadow-red-200 mb-4">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-1">Proctored Exams</h1>
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">Proctored Exams</h1>
           <p className="text-gray-500 text-sm">Your session is recorded and analyzed after submission.</p>
         </div>
         {EXAMS.map(ex=>(
           <button key={ex.id} onClick={()=>{setExam(ex);setPhase('info')}}
-            className="w-full text-left glass rounded-2xl p-5 hover:bg-white/5 transition-all group">
-            <div className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wider mb-1">{ex.course}</div>
-            <div className="text-white font-semibold text-lg group-hover:text-indigo-400 transition-colors">{ex.title}</div>
+            className="w-full text-left glass rounded-2xl p-5 hover:bg-gray-50 transition-all group">
+            <div className="text-[10px] text-indigo-600 font-semibold uppercase tracking-wider mb-1">{ex.course}</div>
+            <div className="text-slate-800 font-semibold text-lg group-hover:text-indigo-600 transition-colors">{ex.title}</div>
             <div className="text-gray-500 text-sm mt-1">{ex.desc}</div>
-            <div className="flex gap-4 mt-3 text-xs text-gray-600">
+            <div className="flex gap-4 mt-3 text-xs text-gray-400">
               <span>{ex.qs.length} questions</span><span>{Math.floor(ex.time/60)} min</span><span>Recorded + analyzed</span>
             </div>
           </button>))}
@@ -249,16 +249,16 @@ export default function ExamPage() {
       <div className="fixed inset-0 bg-gradient-to-br from-base via-surface/60 to-base z-0" />
       <div className="max-w-md w-full glass-heavy rounded-2xl p-7 relative z-10 animate-fade-in-up">
         <div className="text-center mb-5">
-          <div className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wider">{exam.course}</div>
-          <h2 className="text-xl font-bold text-white mt-1">{exam.title}</h2></div>
+          <div className="text-[10px] text-indigo-600 font-semibold uppercase tracking-wider">{exam.course}</div>
+          <h2 className="text-xl font-bold text-slate-800 mt-1">{exam.title}</h2></div>
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[{v:exam.qs.length,l:'Questions'},{v:`${Math.floor(exam.time/60)}m`,l:'Time'},{v:'Video',l:'Recorded'}].map(s=>(
-            <div key={s.l} className="glass-subtle rounded-xl p-3 text-center"><div className="text-white font-bold">{s.v}</div><div className="text-[10px] text-gray-600">{s.l}</div></div>
+            <div key={s.l} className="glass-subtle rounded-xl p-3 text-center"><div className="text-slate-800 font-bold">{s.v}</div><div className="text-[10px] text-gray-400">{s.l}</div></div>
           ))}
         </div>
-        <div className="bg-red-500/8 border border-red-500/15 rounded-xl p-4 mb-5 text-sm text-red-300">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5 text-sm text-red-500">
           <div className="font-semibold mb-2 text-xs uppercase tracking-wide">How proctoring works</div>
-          <div className="text-xs text-red-400/80 space-y-1">
+          <div className="text-xs text-red-500/80 space-y-1">
             <div>Your webcam records the entire session</div>
             <div>After submission, AI analyzes your recording</div>
             <div>Head turns, eye movements, and face absence are detected</div>
@@ -268,7 +268,7 @@ export default function ExamPage() {
         <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="Your full name..." className="input-glass mb-4"/>
         <div className="flex gap-3">
           <button onClick={()=>setPhase('select')} className="btn-secondary flex-1 py-3">&larr; Back</button>
-          <button onClick={startExam} disabled={!name.trim()} className="flex-1 py-3 rounded-xl font-semibold bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/20 disabled:opacity-40 transition-all">Begin Exam</button>
+          <button onClick={startExam} disabled={!name.trim()} className="flex-1 py-3 rounded-xl font-semibold bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-200 disabled:opacity-40 transition-all">Begin Exam</button>
         </div></div></div>)
 
   // ════════════ EXAM ════════════
@@ -276,43 +276,43 @@ export default function ExamPage() {
     <div className="min-h-screen p-3" style={{background:'var(--bg-base)'}}>
       <div className="flex items-center justify-between mb-3 glass rounded-xl px-4 py-2 text-sm">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500 animate-recording"/><span className="text-red-400 font-mono font-bold">{fmt(dur)}</span></div>
-          <span className="text-gray-700">|</span><span className="text-gray-400 text-xs">{name}</span>
-          <span className="text-gray-700">|</span><span className="text-gray-400 text-xs">{nAns}/{total}</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500 animate-recording"/><span className="text-red-500 font-mono font-bold">{fmt(dur)}</span></div>
+          <span className="text-gray-300">|</span><span className="text-gray-400 text-xs">{name}</span>
+          <span className="text-gray-300">|</span><span className="text-gray-400 text-xs">{nAns}/{total}</span></div>
         <div className="flex items-center gap-3">
-          <span className={`font-mono font-bold text-xs ${timeLeft<60?'text-red-400 animate-pulse-soft':'text-gray-400'}`}>{fmt(timeLeft)}</span>
-          <span className="text-gray-600 text-[10px]">{snapCount} frames</span></div></div>
+          <span className={`font-mono font-bold text-xs ${timeLeft<60?'text-red-500 animate-pulse-soft':'text-gray-400'}`}>{fmt(timeLeft)}</span>
+          <span className="text-gray-400 text-[10px]">{snapCount} frames</span></div></div>
       <div className="grid grid-cols-4 gap-3" style={{height:'calc(100vh - 72px)'}}>
         <div className="col-span-3 overflow-auto">
           <div className="glass rounded-2xl p-5">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-white font-bold">Q{curQ+1} <span className="text-gray-600 font-normal text-sm">/ {total}</span></h3>
+              <h3 className="text-slate-800 font-bold">Q{curQ+1} <span className="text-gray-400 font-normal text-sm">/ {total}</span></h3>
               <div className="flex gap-1 flex-wrap">{exam.qs.map((_,i)=>(
-                <button key={i} onClick={()=>setCurQ(i)} className={`w-6 h-6 rounded-lg text-[10px] font-bold transition-all ${i===curQ?'bg-indigo-500 text-white':answers[i]!==undefined?'bg-green-500/15 text-green-400 border border-green-500/20':'bg-white/5 text-gray-700 border border-white/5'}`}>{i+1}</button>
+                <button key={i} onClick={()=>setCurQ(i)} className={`w-6 h-6 rounded-lg text-[10px] font-bold transition-all ${i===curQ?'bg-indigo-500 text-white':answers[i]!==undefined?'bg-green-50 text-green-600 border border-green-200':'bg-gray-50 text-gray-300 border border-gray-200'}`}>{i+1}</button>
               ))}</div></div>
             <p className="text-gray-200 text-lg mb-5 leading-relaxed">{q.q}</p>
             <div className="space-y-2">{q.o.map((opt,i)=>(
               <button key={i} onClick={()=>pickAnswer(curQ,i)}
-                className={`w-full text-left px-4 py-3 rounded-xl border transition-all text-sm ${answers[curQ]===i?'bg-indigo-500/15 border-indigo-500/30 text-indigo-200':'glass-subtle text-gray-300 hover:bg-white/5'}`}>
-                <span className={`inline-flex w-6 h-6 rounded-full border-2 items-center justify-center text-xs font-bold mr-3 ${answers[curQ]===i?'border-indigo-400 bg-indigo-500/30 text-indigo-300':'border-gray-700 text-gray-600'}`}>{String.fromCharCode(65+i)}</span>{opt}
+                className={`w-full text-left px-4 py-3 rounded-xl border transition-all text-sm ${answers[curQ]===i?'bg-indigo-50 border-indigo-200 text-indigo-400':'glass-subtle text-gray-300 hover:bg-gray-50'}`}>
+                <span className={`inline-flex w-6 h-6 rounded-full border-2 items-center justify-center text-xs font-bold mr-3 ${answers[curQ]===i?'border-indigo-400 bg-indigo-500/30 text-indigo-500':'border-gray-700 text-gray-400'}`}>{String.fromCharCode(65+i)}</span>{opt}
               </button>))}</div>
             <div className="flex justify-between mt-5">
               <button onClick={()=>setCurQ(Math.max(0,curQ-1))} disabled={curQ===0} className="btn-secondary text-xs px-4 py-2 disabled:opacity-30">&larr; Prev</button>
-              {curQ<total-1?<button onClick={()=>setCurQ(curQ+1)} className="px-4 py-2 rounded-xl bg-indigo-500/15 border border-indigo-500/20 text-indigo-400 text-xs font-medium">Next &rarr;</button>
+              {curQ<total-1?<button onClick={()=>setCurQ(curQ+1)} className="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 text-xs font-medium">Next &rarr;</button>
               :<button onClick={submitExam} disabled={nAns<total} className="btn-success text-xs px-5 py-2 disabled:opacity-40">Submit ({nAns}/{total})</button>}
             </div></div></div>
         <div className="space-y-3">
-          <div className="rounded-2xl overflow-hidden border-2 border-red-500/20">
+          <div className="rounded-2xl overflow-hidden border-2 border-red-200">
             <div className="relative bg-black aspect-[3/4]">
               <video ref={vidRef} autoPlay playsInline muted className="w-full h-full object-cover"/>
               <canvas ref={canRef} className="hidden"/>
-              <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-red-500/80 flex items-center gap-1">
+              <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-red-500 flex items-center gap-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse-soft"/><span className="text-white text-[9px] font-bold">REC</span></div>
-              <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/60 text-white text-[9px]">{snapCount} snapshots</div>
+              <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/30 text-slate-800 text-[9px]">{snapCount} snapshots</div>
             </div></div>
           <div className="glass-subtle rounded-xl p-3 text-center">
             <div className="text-[10px] text-gray-500">Session recorded</div>
-            <div className="text-[9px] text-gray-700 mt-0.5">AI analysis runs after submission</div>
+            <div className="text-[9px] text-gray-300 mt-0.5">AI analysis runs after submission</div>
           </div></div>
       </div></div>)}
 
@@ -320,15 +320,15 @@ export default function ExamPage() {
   if(phase==='processing') return(
     <div className="min-h-screen flex items-center justify-center p-6" style={{background:'var(--bg-base)'}}>
       <div className="max-w-md w-full text-center animate-fade-in">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 shadow-lg shadow-indigo-500/20 mb-5">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 shadow-lg shadow-indigo-200 mb-5">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </div>
-        <h2 className="text-xl font-bold text-white mb-2">Analyzing Your Session</h2>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">Analyzing Your Session</h2>
         <p className="text-gray-500 text-sm mb-5">{procMsg}</p>
-        <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden mb-3">
+        <div className="w-full h-2 bg-gray-50 rounded-full overflow-hidden mb-3">
           <div className="h-full bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full transition-all duration-300" style={{width:`${procProgress}%`}}/></div>
-        <div className="text-white font-mono font-bold">{procProgress}%</div>
-        <div className="text-gray-600 text-xs mt-2">{snapsRef.current.length} frames to analyze</div>
+        <div className="text-slate-800 font-mono font-bold">{procProgress}%</div>
+        <div className="text-gray-400 text-xs mt-2">{snapsRef.current.length} frames to analyze</div>
       </div></div>)
 
   // ════════════ RESULTS ════════════
@@ -343,9 +343,9 @@ export default function ExamPage() {
       <div className="max-w-4xl mx-auto space-y-5 animate-fade-in">
         {/* Scores */}
         <div className="text-center glass-heavy rounded-2xl p-7">
-          <div className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wider">{exam?.course}</div>
-          <h2 className="text-xl font-bold text-white mt-1 mb-1">{exam?.title} — Results</h2>
-          <p className="text-gray-600 text-sm mb-5">{name} · {fmt(dur)}</p>
+          <div className="text-[10px] text-indigo-600 font-semibold uppercase tracking-wider">{exam?.course}</div>
+          <h2 className="text-xl font-bold text-slate-800 mt-1 mb-1">{exam?.title} — Results</h2>
+          <p className="text-gray-400 text-sm mb-5">{name} · {fmt(dur)}</p>
           <div className="grid grid-cols-5 gap-3">
             {[
               {v:`${pct}%`,l:'Exam Score',s:`${correct}/${total}`,c:pct>=70?'#22c55e':pct>=50?'#eab308':'#ef4444'},
@@ -357,50 +357,50 @@ export default function ExamPage() {
               <div key={x.l} className="glass-subtle rounded-xl p-3">
                 <div className="text-xl font-bold" style={{color:x.c}}>{x.v}</div>
                 <div className="text-gray-500 text-[10px] mt-0.5">{x.l}</div>
-                <div className="text-[9px] text-gray-700">{x.s}</div></div>))}</div></div>
+                <div className="text-[9px] text-gray-300">{x.s}</div></div>))}</div></div>
 
         <div className="grid grid-cols-2 gap-5">
           {videoUrl && (
             <div className="glass rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Session Recording</h3>
               <video src={videoUrl} controls className="w-full rounded-xl" />
-              <a href={videoUrl} download={`exam_recording_${Date.now()}.webm`} className="block mt-2 text-center text-xs text-indigo-400 hover:text-indigo-300">Download Recording</a>
+              <a href={videoUrl} download={`exam_recording_${Date.now()}.webm`} className="block mt-2 text-center text-xs text-indigo-600 hover:text-indigo-500">Download Recording</a>
             </div>)}
           {focusLog.length>0 && (
             <div className="glass rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Focus Timeline</h3>
               <div className="flex gap-[1px] h-8 rounded-lg overflow-hidden mb-2">
                 {focusLog.map((e,i)=><div key={i} className="flex-1" title={`${fmt(e.ts)} — ${e.d||e.s}`} style={{background:e.c||'#6b7280'}}/>)}</div>
-              <div className="flex justify-between text-[10px] text-gray-600"><span>Start</span>
+              <div className="flex justify-between text-[10px] text-gray-400"><span>Start</span>
                 <span className="flex gap-2">{[{c:'#22c55e',l:'Focused'},{c:'#eab308',l:'Glance'},{c:'#f97316',l:'Turned'},{c:'#ef4444',l:'Away'}].map(x=><span key={x.l} className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-sm" style={{background:x.c}}/>{x.l}</span>)}</span>
                 <span>End</span></div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                 {[{v:hw,l:'head turns'},{v:ew,l:'eye glances'},{v:aw,l:'face absent'},{v:gapWarns.length,l:'timing flags'}].map(x=>(
-                  <div key={x.l} className="glass-subtle rounded-lg p-2 text-center"><span className="text-white font-bold">{x.v}</span><span className="text-gray-600 ml-1">{x.l}</span></div>
+                  <div key={x.l} className="glass-subtle rounded-lg p-2 text-center"><span className="text-slate-800 font-bold">{x.v}</span><span className="text-gray-400 ml-1">{x.l}</span></div>
                 ))}
               </div></div>)}
         </div>
 
         {gapWarns.length>0&&(
           <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-amber-400 uppercase tracking-wider mb-2">Answer Timing Flags</h3>
-            {gapWarns.map((g,i)=><div key={i} className="text-xs text-amber-300 bg-amber-500/8 rounded-xl px-4 py-2 mb-1 flex justify-between"><span>Q{g.q}: {g.gap}s delay</span><span className="text-amber-500">{fmt(g.ts)}</span></div>)}</div>)}
+            <h3 className="text-sm font-semibold text-amber-600 uppercase tracking-wider mb-2">Answer Timing Flags</h3>
+            {gapWarns.map((g,i)=><div key={i} className="text-xs text-amber-500 bg-amber-50 rounded-xl px-4 py-2 mb-1 flex justify-between"><span>Q{g.q}: {g.gap}s delay</span><span className="text-amber-500">{fmt(g.ts)}</span></div>)}</div>)}
 
         <div className="glass rounded-2xl p-5">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Answer Review</h3>
           {exam?.qs.map((q,i)=>{const s=answers[i],ok=s===q.a;return(
-            <div key={i} className={`rounded-xl p-3 border mb-1.5 text-sm ${ok?'bg-green-500/8 border-green-500/15':'bg-red-500/8 border-red-500/15'}`}>
-              <span className={`font-bold mr-1.5 ${ok?'text-green-400':'text-red-400'}`}>{ok?'✓':'✗'}</span>
+            <div key={i} className={`rounded-xl p-3 border mb-1.5 text-sm ${ok?'bg-green-500/8 border-green-500/15':'bg-red-50 border-red-200'}`}>
+              <span className={`font-bold mr-1.5 ${ok?'text-green-600':'text-red-500'}`}>{ok?'✓':'✗'}</span>
               <span className="text-gray-300">Q{i+1}: {q.q}</span>
-              <div className="text-xs mt-0.5 ml-6"><span className={ok?'text-green-400':'text-red-400'}>{s!==undefined?q.o[s]:'Not answered'}</span>
-                {!ok&&s!==undefined&&<span className="text-green-400 ml-2">Correct: {q.o[q.a]}</span>}
-                {ansTs[i]!==undefined&&<span className="text-gray-700 ml-2">at {fmt(ansTs[i])}</span>}</div></div>)})}</div>
+              <div className="text-xs mt-0.5 ml-6"><span className={ok?'text-green-600':'text-red-500'}>{s!==undefined?q.o[s]:'Not answered'}</span>
+                {!ok&&s!==undefined&&<span className="text-green-600 ml-2">Correct: {q.o[q.a]}</span>}
+                {ansTs[i]!==undefined&&<span className="text-gray-300 ml-2">at {fmt(ansTs[i])}</span>}</div></div>)})}</div>
 
         {alerts.length>0&&(
           <div className="glass rounded-2xl p-5">
             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">All Proctoring Alerts ({alerts.length})</h3>
             <div className="max-h-40 overflow-y-auto space-y-1">
-              {alerts.map((w,i)=><div key={i} className="text-xs text-red-300 bg-red-500/8 rounded-lg px-3 py-2">{fmt(w.t)} — {w.m}</div>)}</div></div>)}
+              {alerts.map((w,i)=><div key={i} className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{fmt(w.t)} — {w.m}</div>)}</div></div>)}
 
         <div className="text-center pb-8">
           <button onClick={()=>{setPhase('select');setExam(null);setAnswers({});setAlerts([]);setFocusLog([]);if(videoUrl)URL.revokeObjectURL(videoUrl);setVideoUrl(null)}}

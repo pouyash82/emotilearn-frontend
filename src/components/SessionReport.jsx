@@ -53,20 +53,20 @@ export default function SessionReport({ sessionData, onClose }) {
   }
 
   if (!report) return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="glass-heavy rounded-2xl p-8 flex items-center gap-3"><div className="w-5 h-5 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" /><span className="text-white text-sm">Generating report...</span></div>
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="glass-heavy rounded-2xl p-8 flex items-center gap-3"><div className="w-5 h-5 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" /><span className="text-slate-800 text-sm">Generating report...</span></div>
     </div>
   )
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" style={{ overflowY: 'scroll', WebkitOverflowScrolling: 'touch' }}>
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50" style={{ overflowY: 'scroll', WebkitOverflowScrolling: 'touch' }}>
       <div className="flex justify-center px-4 py-8">
         <div className="w-full max-w-2xl animate-fade-in-up">
           <div className="glass-heavy rounded-2xl p-6">
             {/* Header */}
             <div className="flex justify-between items-center mb-5">
-              <h2 className="text-xl font-bold text-white">Session Report</h2>
-              <button onClick={onClose} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all">
+              <h2 className="text-xl font-bold text-slate-800">Session Report</h2>
+              <button onClick={onClose} className="p-1.5 rounded-lg text-gray-500 hover:text-slate-800 hover:bg-gray-100 transition-all">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
@@ -81,7 +81,7 @@ export default function SessionReport({ sessionData, onClose }) {
               ].map(s => (
                 <div key={s.label} className="glass-subtle rounded-xl p-3 text-center">
                   <div className="text-lg font-bold truncate capitalize" style={s.color ? { color: s.color } : { color: 'white' }}>{s.value}</div>
-                  <div className="text-[10px] text-gray-600 mt-0.5">{s.label}</div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">{s.label}</div>
                 </div>
               ))}
             </div>
@@ -94,7 +94,7 @@ export default function SessionReport({ sessionData, onClose }) {
                   <div key={emotion} className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: EMOTION_COLORS[emotion]?.hex }} />
                     <span className="w-20 text-gray-400 capitalize text-xs">{emotion}</span>
-                    <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                    <div className="flex-1 h-2 bg-gray-50 rounded-full overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: EMOTION_COLORS[emotion]?.hex }} />
                     </div>
                     <span className="w-10 text-right font-bold text-xs" style={{ color: EMOTION_COLORS[emotion]?.hex }}>{pct}%</span>

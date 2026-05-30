@@ -29,9 +29,9 @@ export default function ChatButton() {
       onClick={() => navigate('/chat')}
       className={`fixed bottom-6 right-6 z-50 w-12 h-12 rounded-xl 
         bg-gradient-to-br from-indigo-500 to-blue-500 
-        text-white shadow-lg shadow-indigo-500/25 
+        text-slate-800 shadow-lg shadow-indigo-200 
         flex items-center justify-center 
-        hover:scale-105 hover:shadow-indigo-500/40 active:scale-95 
+        hover:scale-105 hover:shadow-indigo-300 active:scale-95 
         transition-all duration-300
         ${pulse ? 'animate-bounce' : ''}`}
       title="Messages"
@@ -41,7 +41,7 @@ export default function ChatButton() {
       </svg>
 
       {unread > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 flex items-center justify-center rounded-full bg-rose-500 text-white text-[9px] font-bold px-1 border-2 border-[var(--bg-base)] animate-pulse-soft">
+        <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 flex items-center justify-center rounded-full bg-rose-500 text-slate-800 text-[9px] font-bold px-1 border-2 border-[var(--bg-base)] animate-pulse-soft">
           {unread > 99 ? '99+' : unread}
         </span>
       )}

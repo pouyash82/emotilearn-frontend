@@ -37,17 +37,17 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative" style={{ background: 'var(--bg-base)' }}>
       <div className="fixed inset-0 bg-gradient-to-br from-base via-surface/60 to-base z-0" />
-      <div className="fixed top-1/4 right-1/4 w-72 h-72 bg-indigo-600/15 rounded-full blur-[100px] animate-float" />
-      <div className="fixed bottom-1/4 left-1/4 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px] animate-float-delayed" />
+      <div className="fixed top-1/4 right-1/4 w-72 h-72 bg-indigo-200/30 rounded-full blur-[100px] animate-float" />
+      <div className="fixed bottom-1/4 left-1/4 w-64 h-64 bg-purple-200/20 rounded-full blur-[100px] animate-float-delayed" />
 
       <div className="relative z-10 w-full max-w-md animate-fade-in-up">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/20 mb-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 shadow-lg shadow-indigo-200 mb-4">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
-          <h1 className="text-2xl font-bold text-white">Admin Access</h1>
-          <p className="text-gray-600 text-sm mt-1">EmotiLearn System Administration</p>
+          <h1 className="text-2xl font-bold text-slate-800">Admin Access</h1>
+          <p className="text-gray-400 text-sm mt-1">EmotiLearn System Administration</p>
         </div>
 
         {/* Card */}
@@ -63,7 +63,7 @@ export default function AdminLogin() {
                 onKeyDown={e => e.key === 'Enter' && handleLogin()} />
             </div>
 
-            {error && <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-shake">{error}</div>}
+            {error && <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-500 text-sm animate-shake">{error}</div>}
 
             <button onClick={handleLogin} disabled={loading || !email || !password}
               className="w-full btn-primary py-3 disabled:opacity-40">
@@ -74,11 +74,11 @@ export default function AdminLogin() {
           </div>
 
           {/* Authorized list */}
-          <div className="mt-5 pt-5 border-t border-white/5">
-            <p className="text-[10px] text-gray-600 uppercase tracking-wider font-medium mb-2">Authorized accounts</p>
+          <div className="mt-5 pt-5 border-t border-gray-200">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium mb-2">Authorized accounts</p>
             <div className="space-y-1">
               {ADMIN_EMAILS.map(e => (
-                <div key={e} className="text-xs text-gray-600 flex items-center gap-2">
+                <div key={e} className="text-xs text-gray-400 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/40" />{e}
                 </div>
               ))}
@@ -87,7 +87,7 @@ export default function AdminLogin() {
         </div>
 
         <div className="text-center mt-5">
-          <Link to="/login" className="text-gray-600 text-sm hover:text-gray-400 transition-colors">&larr; Back to login</Link>
+          <Link to="/login" className="text-gray-400 text-sm hover:text-gray-400 transition-colors">&larr; Back to login</Link>
         </div>
       </div>
     </div>

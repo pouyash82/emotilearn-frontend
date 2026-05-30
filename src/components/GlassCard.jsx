@@ -37,7 +37,7 @@ export default function GlassCard({
       style={accent ? { '--card-accent': accentColors[accent] || accentColors.indigo } : undefined}
     >
       {/* Subtle gradient shimmer at top */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent pointer-events-none" />
 
       {/* Content */}
       <div className="relative z-10">

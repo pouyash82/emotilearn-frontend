@@ -37,37 +37,37 @@ export default function Login() {
       <div className="fixed inset-0 bg-gradient-to-br from-base via-surface/60 to-base z-0" />
 
       {/* Orbs */}
-      <div className="fixed top-1/4 left-1/4 w-80 h-80 bg-indigo-600/20 rounded-full blur-[100px] animate-float" />
-      <div className="fixed bottom-1/4 right-1/4 w-72 h-72 bg-blue-600/15 rounded-full blur-[100px] animate-float-delayed" />
+      <div className="fixed top-1/4 left-1/4 w-80 h-80 bg-indigo-200/40 rounded-full blur-[100px] animate-float" />
+      <div className="fixed bottom-1/4 right-1/4 w-72 h-72 bg-blue-200/30 rounded-full blur-[100px] animate-float-delayed" />
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-md animate-fade-in-up">
 
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 shadow-lg shadow-indigo-500/25 mb-5 animate-bounce-slow">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 shadow-lg shadow-indigo-200 mb-5 animate-bounce-slow">
             <span className="text-3xl font-bold text-white">E</span>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-1.5 tracking-tight">
-            Emoti<span className="text-indigo-400">Learn</span>
+          <h1 className="text-3xl font-bold text-slate-800 mb-1.5 tracking-tight">
+            Emoti<span className="text-indigo-600">Learn</span>
           </h1>
           <p className="text-gray-500 text-sm">
             <TypingText
               texts={['Emotion-Aware Learning', 'Real-Time Engagement', 'Smart Education']}
               speed={70}
-              className="text-indigo-400/80"
+              className="text-indigo-600/80"
             />
           </p>
         </div>
 
         {/* Login Card */}
         <div className="glass-heavy rounded-2xl p-8">
-          <h2 className="text-xl font-semibold text-white mb-6 text-center">
+          <h2 className="text-xl font-semibold text-slate-800 mb-6 text-center">
             Welcome back
           </h2>
 
           {error && (
-            <div className="mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-shake">
+            <div className="mb-5 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-500 text-sm animate-shake">
               {error}
             </div>
           )}
@@ -87,7 +87,7 @@ export default function Login() {
                   className="input-glass pr-10"
                   placeholder="you@example.com"
                 />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-600 text-sm">
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
                   </svg>
@@ -112,7 +112,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300 transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {showPass ? (
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -149,22 +149,22 @@ export default function Login() {
 
           {/* Divider */}
           <div className="flex items-center my-6">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            <span className="px-4 text-gray-600 text-xs">or</span>
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+            <span className="px-4 text-gray-400 text-xs">or</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
           </div>
 
           {/* Register link */}
           <p className="text-center text-gray-500 text-sm">
             Don't have an account?{' '}
-            <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+            <Link to="/register" className="text-indigo-600 hover:text-indigo-500 font-medium transition-colors">
               Create one
             </Link>
           </p>
         </div>
 
         {/* Footer */}
-        <p className="text-center text-gray-700 text-xs mt-6">
+        <p className="text-center text-gray-300 text-xs mt-6">
           &copy; 2026 EmotiLearn &middot; Learning Profile System
         </p>
       </div>
