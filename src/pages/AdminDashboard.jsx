@@ -378,34 +378,9 @@ export default function AdminDashboard() {
 
                 {smtpStatus?.configured ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-4 gap-3">
-                      {[
-                        { l: 'Host', v: smtpStatus.host },
-                        { l: 'Port', v: smtpStatus.port },
-                        { l: 'User', v: smtpStatus.user },
-                        { l: 'TLS', v: smtpStatus.use_tls ? 'Enabled' : 'Disabled' },
-                      ].map(s => (
-                        <div key={s.l} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                          <div className="text-[10px] text-gray-400 uppercase tracking-wider">{s.l}</div>
-                          <div className="text-sm text-slate-700 font-medium mt-0.5 truncate">{s.v}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Test email */}
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Send Test Email</div>
-                      <div className="flex gap-2">
-                        <input type="email" value={smtpTestEmail} onChange={e => setSmtpTestEmail(e.target.value)} placeholder="recipient@example.com" className="input-glass flex-1 text-sm py-2" />
-                        <button onClick={smtpTest} disabled={smtpSending || !smtpTestEmail} className="btn-primary text-xs px-4 py-2 disabled:opacity-40">
-                          {smtpSending ? 'Sending...' : 'Send Test'}
-                        </button>
-                      </div>
-                    </div>
-
                     {/* Bulk email */}
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Send Bulk Notification</div>
+                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Send Notification</div>
                       <div className="space-y-2">
                         <input type="text" value={bulkEmailForm.subject} onChange={e => setBulkEmailForm({...bulkEmailForm, subject: e.target.value})} placeholder="Email subject" className="input-glass text-sm py-2" />
                         <textarea value={bulkEmailForm.message} onChange={e => setBulkEmailForm({...bulkEmailForm, message: e.target.value})} placeholder="Message content" rows={3} className="w-full input-glass text-sm resize-none" />
@@ -416,7 +391,7 @@ export default function AdminDashboard() {
                             <option value="teacher">Teachers Only</option>
                           </select>
                           <button onClick={smtpBulkSend} disabled={smtpSending || !bulkEmailForm.subject} className="btn-primary text-xs px-4 py-2 disabled:opacity-40">
-                            {smtpSending ? 'Sending...' : 'Send to All'}
+                            {smtpSending ? 'Sending...' : 'Send'}
                           </button>
                         </div>
                       </div>
