@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext'
 import API from '../api'
 import AnimatedBackground from '../components/AnimatedBackground'
 import TypingText from '../components/TypingText'
-import GlassCard from '../components/GlassCard'
 
 export default function Login() {
   const [email, setEmail]       = useState('')
@@ -22,7 +21,7 @@ export default function Login() {
     try {
       const res = await API.post('/auth/login', { email, password })
       login(res.data.user, res.data.access_token)
-      navigate(res.data.user.role === 'teacher' ? '/teacher' : '/dashboard')
+      navigate(res.data.user.role === 'teacher' ? '/teacher' : '/student')
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed')
     } finally {
@@ -32,58 +31,51 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative">
-      {/* Animated particle background */}
       <AnimatedBackground />
-      
-      {/* Gradient overlay */}
-      <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-slate-900/50 to-slate-950 z-0" />
-      
-      {/* Floating gradient orbs */}
-      <div className="fixed top-1/4 left-1/4 w-96 h-96 bg-blue-600/30 rounded-full blur-3xl animate-float" />
-      <div className="fixed bottom-1/4 right-1/4 w-80 h-80 bg-indigo-600/20 rounded-full blur-3xl animate-float-delayed" />
-      <div className="fixed top-1/2 right-1/3 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl animate-float-slow" />
 
-      {/* Main content */}
+      {/* Gradient base */}
+      <div className="fixed inset-0 bg-gradient-to-br from-base via-surface/60 to-base z-0" />
+
+      {/* Orbs */}
+      <div className="fixed top-1/4 left-1/4 w-80 h-80 bg-indigo-600/20 rounded-full blur-[100px] animate-float" />
+      <div className="fixed bottom-1/4 right-1/4 w-72 h-72 bg-blue-600/15 rounded-full blur-[100px] animate-float-delayed" />
+
+      {/* Content */}
       <div className="relative z-10 w-full max-w-md animate-fade-in-up">
-        
+
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 shadow-lg shadow-blue-500/30 mb-6 animate-bounce-slow">
-            <span className="text-4xl">🧠</span>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 shadow-lg shadow-indigo-500/25 mb-5 animate-bounce-slow">
+            <span className="text-3xl font-bold text-white">E</span>
           </div>
-          <h1 className="text-4xl font-black bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent mb-2">
-            EmotiLearn
+          <h1 className="text-3xl font-bold text-white mb-1.5 tracking-tight">
+            Emoti<span className="text-indigo-400">Learn</span>
           </h1>
-          <p className="text-gray-400">
-            <TypingText 
-              texts={[
-                
-                'Emotion Recognition',
-                'Smart Education',
-                'Track Your Progress'
-              ]}
-              speed={80}
-              className="text-blue-400"
+          <p className="text-gray-500 text-sm">
+            <TypingText
+              texts={['Emotion-Aware Learning', 'Real-Time Engagement', 'Smart Education']}
+              speed={70}
+              className="text-indigo-400/80"
             />
           </p>
         </div>
 
         {/* Login Card */}
-        <GlassCard glow className="p-8">
-          <h2 className="text-2xl font-bold text-white mb-6 text-center">
-            Welcome Back
+        <div className="glass-heavy rounded-2xl p-8">
+          <h2 className="text-xl font-semibold text-white mb-6 text-center">
+            Welcome back
           </h2>
 
           {error && (
-            <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm animate-shake">
+            <div className="mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-shake">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
-            <div className="group">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5 tracking-wide uppercase">
                 Email
               </label>
               <div className="relative">
@@ -92,23 +84,20 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-5 py-4 rounded-2xl
-                           bg-white/5 border border-white/10
-                           text-white placeholder-gray-500
-                           focus:outline-none focus:border-blue-500/50 focus:bg-white/10
-                           focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
-                           transition-all duration-300"
+                  className="input-glass pr-10"
                   placeholder="you@example.com"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">
-                  ✉️
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-600 text-sm">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+                  </svg>
                 </span>
               </div>
             </div>
 
             {/* Password */}
-            <div className="group">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5 tracking-wide uppercase">
                 Password
               </label>
               <div className="relative">
@@ -117,76 +106,66 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-5 py-4 rounded-2xl
-                           bg-white/5 border border-white/10
-                           text-white placeholder-gray-500
-                           focus:outline-none focus:border-blue-500/50 focus:bg-white/10
-                           focus:shadow-[0_0_20px_rgba(168,85,247,0.3)]
-                           transition-all duration-300"
+                  className="input-glass pr-10"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300 transition-colors"
                 >
-                  {showPass ? '🙈' : '👁️'}
+                  {showPass ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 rounded-2xl font-bold text-white
-                       bg-gradient-to-r from-blue-600 to-indigo-600
-                       hover:from-blue-500 hover:to-indigo-500
-                       shadow-lg shadow-blue-500/30
-                       hover:shadow-blue-500/50 hover:scale-[1.02]
-                       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
-                       transition-all duration-300
-                       relative overflow-hidden group"
+              className="w-full btn-primary py-3.5 relative overflow-hidden group mt-2"
             >
               <span className="relative z-10 flex items-center justify-center gap-2">
                 {loading ? (
                   <>
-                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Signing in...
                   </>
                 ) : (
                   <>
                     Sign In
-                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="group-hover:translate-x-1 transition-transform">
+                      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                    </svg>
                   </>
                 )}
               </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </button>
           </form>
 
           {/* Divider */}
           <div className="flex items-center my-6">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-            <span className="px-4 text-gray-500 text-sm">or</span>
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <span className="px-4 text-gray-600 text-xs">or</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
           </div>
 
           {/* Register link */}
-          <p className="text-center text-gray-400">
+          <p className="text-center text-gray-500 text-sm">
             Don't have an account?{' '}
-            <Link 
-              to="/register" 
-              className="text-blue-400 hover:text-purple-300 font-medium hover:underline transition-colors"
-            >
+            <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
               Create one
             </Link>
           </p>
-        </GlassCard>
+        </div>
 
         {/* Footer */}
-        <p className="text-center text-gray-600 text-sm mt-8">
-          © 2026 EmotiLearn • Learning Profile System
+        <p className="text-center text-gray-700 text-xs mt-6">
+          &copy; 2026 EmotiLearn &middot; Learning Profile System
         </p>
       </div>
     </div>

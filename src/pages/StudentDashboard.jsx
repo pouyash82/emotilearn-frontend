@@ -1,28 +1,35 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import Navbar from '../components/Navbar'
+import DashboardLayout from '../components/DashboardLayout'
 import GlassCard from '../components/GlassCard'
-import TypingText from '../components/TypingText'
 import SessionReport from '../components/SessionReport'
 import CompareWithClass from '../components/CompareWithClass'
 import ChatButton from '../components/ChatButton'
 import API from '../api'
 
 const EMOTION_COLORS = {
-  anger: { bg: 'bg-red-500', hex: '#ef4444', emoji: '😠' },
-  disgust: { bg: 'bg-violet-500', hex: '#8b5cf6', emoji: '🤢' },
-  fear: { bg: 'bg-orange-500', hex: '#f97316', emoji: '😨' },
-  happiness: { bg: 'bg-green-500', hex: '#22c55e', emoji: '😊' },
-  neutral: { bg: 'bg-gray-500', hex: '#6b7280', emoji: '😐' },
-  sadness: { bg: 'bg-blue-500', hex: '#3b82f6', emoji: '😢' },
-  surprise: { bg: 'bg-yellow-500', hex: '#eab308', emoji: '😲' },
+  anger:     { hex: '#ef4444', label: 'Anger' },
+  disgust:   { hex: '#8b5cf6', label: 'Disgust' },
+  fear:      { hex: '#f97316', label: 'Fear' },
+  happiness: { hex: '#22c55e', label: 'Happiness' },
+  neutral:   { hex: '#6b7280', label: 'Neutral' },
+  sadness:   { hex: '#3b82f6', label: 'Sadness' },
+  surprise:  { hex: '#eab308', label: 'Surprise' },
 }
+
+const EMOTION_LEGEND = [
+  { key: 'happiness', color: '#22c55e', label: 'Focused' },
+  { key: 'neutral',   color: '#6b7280', label: 'Calm' },
+  { key: 'fear',      color: '#f97316', label: 'Anxious' },
+  { key: 'sadness',   color: '#8b5cf6', label: 'Confused' },
+  { key: 'anger',     color: '#ef4444', label: 'Disengaged' },
+]
 
 export default function StudentDashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [tab, setTab] = useState('live')
+  const [tab, setTab] = useState('overview')
   const [isSessionActive, setIsSessionActive] = useState(false)
   const [cameraOn, setCameraOn] = useState(false)
   const [currentEmotion, setCurrentEmotion] = useState(null)
@@ -37,7 +44,6 @@ export default function StudentDashboard() {
   const [sessionData, setSessionData] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  // ── Courses, Exams, Notifications ──────────────────────────────────
   const [myCourses, setMyCourses] = useState([])
   const [availableCourses, setAvailableCourses] = useState([])
   const [myExams, setMyExams] = useState([])
@@ -45,31 +51,26 @@ export default function StudentDashboard() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [showBrowse, setShowBrowse] = useState(false)
 
-  // ── Multimodal state ─────────────────────────────────────────────────
   const [micOn, setMicOn] = useState(false)
   const [transcription, setTranscription] = useState('')
   const [textEmotion, setTextEmotion] = useState(null)
   const [transcribing, setTranscribing] = useState(false)
   const [voiceEmotion, setVoiceEmotion] = useState(null)
 
-  // Session tracking
   const emotionHistoryRef = useRef([])
   const detectionCountRef = useRef(0)
-
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
   const intervalRef = useRef(null)
   const durationIntervalRef = useRef(null)
   const isAnalyzingRef = useRef(false)
-
-  // ── Mic refs (records entire session in segments) ─────────────────────
   const audioStreamRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const audioIntervalRef = useRef(null)
   const allTranscriptsRef = useRef([])
-  const allAudioBlobsRef = useRef([])     // saves all audio for final voice emotion
+  const allAudioBlobsRef = useRef([])
   const transcriptBoxRef = useRef(null)
 
   useEffect(() => {
@@ -84,18 +85,15 @@ export default function StudentDashboard() {
         setSessionDuration(Math.floor((Date.now() - sessionStartTime) / 1000))
       }, 1000)
     }
-    return () => {
-      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current)
-    }
+    return () => { if (durationIntervalRef.current) clearInterval(durationIntervalRef.current) }
   }, [isSessionActive, sessionStartTime])
 
-  // ── Fetch courses, exams, notifications when switching tabs ──────
   useEffect(() => {
     if (tab === 'courses') {
       API.get('/students/courses').then(r => setMyCourses(r.data.courses || [])).catch(() => {})
       API.get('/students/exams').then(r => setMyExams(r.data.exams || [])).catch(() => {})
     }
-    if (tab === 'notifs') {
+    if (tab === 'notifications') {
       API.get('/notifications').then(r => {
         setNotifications(r.data.notifications || [])
         setUnreadCount(r.data.unread || 0)
@@ -103,310 +101,198 @@ export default function StudentDashboard() {
     }
   }, [tab])
 
-  // Fetch unread count on mount
   useEffect(() => {
     API.get('/notifications').then(r => setUnreadCount(r.data.unread || 0)).catch(() => {})
   }, [])
 
-  const loadAvailableCourses = () => {
-    API.get('/courses/available').then(r => {
-      setAvailableCourses(r.data.courses || [])
-      setShowBrowse(true)
-    }).catch(() => {})
-  }
+  /* ── Derived metrics from sessions ── */
+  const derivedMetrics = (() => {
+    if (sessions.length === 0) return { avgDuration: 0, bestHour: null, weeklyData: [] }
+    let totalDur = 0, hourEngMap = {}, weekMap = {}
+    const now = new Date()
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    sessions.forEach(s => {
+      totalDur += (s.duration || 0)
+      if (s.started_at) {
+        const d = new Date(s.started_at)
+        const h = d.getHours()
+        if (!hourEngMap[h]) hourEngMap[h] = []
+        hourEngMap[h].push(s.avg_engagement || 0)
+        if (d >= weekAgo) {
+          const dayKey = d.toLocaleDateString('en-US', { weekday: 'short' })
+          if (!weekMap[dayKey]) weekMap[dayKey] = { sessions: [], date: d }
+          weekMap[dayKey].sessions.push(s)
+        }
+      }
+    })
+    const avgDuration = sessions.length > 0 ? Math.round(totalDur / sessions.length) : 0
+    let bestHour = null, bestAvg = 0
+    Object.entries(hourEngMap).forEach(([h, engs]) => {
+      const avg = engs.reduce((a, b) => a + b, 0) / engs.length
+      if (avg > bestAvg) { bestAvg = avg; bestHour = parseInt(h) }
+    })
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    const weeklyData = days.map(d => {
+      const entry = weekMap[d]
+      if (!entry) return { day: d, sessions: 0, engagement: 0, duration: 0, emotions: {} }
+      const ss = entry.sessions
+      const avgEng = ss.reduce((a, s) => a + (s.avg_engagement || 0), 0) / ss.length
+      const totDur = ss.reduce((a, s) => a + (s.duration || 0), 0)
+      const emotions = {}
+      ss.forEach(s => { if (s.dominant_emotion) emotions[s.dominant_emotion] = (emotions[s.dominant_emotion] || 0) + 1 })
+      return { day: d, date: entry.date, sessions: ss.length, engagement: Math.round(avgEng), duration: totDur, emotions }
+    })
+    return { avgDuration, bestHour, bestAvg: Math.round(bestAvg), weeklyData }
+  })()
 
+  const formatDuration = (s) => { const m = Math.floor(s / 60); return `${m}:${(s % 60).toString().padStart(2, '0')}` }
+  const formatMinSec = (s) => { const m = Math.floor(s / 60); const sec = s % 60; return `${m}:${sec.toString().padStart(2, '0')}` }
+  const formatHour = (h) => { if (h === null) return '--'; const ampm = h >= 12 ? 'PM' : 'AM'; return `${h % 12 || 12}–${(h + 1) % 12 || 12} ${ampm}` }
+
+  /* ═══════════ All session logic (unchanged) ═══════════ */
+  const loadStats = async () => {
+    try {
+      const res = await API.get('/students/stats')
+      setStats({ sessions: res.data.total_sessions ?? 0, avgEngagement: res.data.avg_engagement ?? 0, detections: res.data.total_detections ?? 0 })
+    } catch { console.log('Stats not available') }
+  }
+  const loadSessions = async () => {
+    try { const res = await API.get('/students/sessions'); setSessions(res.data || []) }
+    catch { console.log('Sessions not available') }
+  }
+  const loadAvailableCourses = () => {
+    API.get('/courses/available').then(r => { setAvailableCourses(r.data.courses || []); setShowBrowse(true) }).catch(() => {})
+  }
   const enrollInCourse = async (courseId) => {
     try {
-      await API.post(`/courses/${courseId}/enroll`)
-      setShowBrowse(false)
+      await API.post(`/courses/${courseId}/enroll`); setShowBrowse(false)
       API.get('/students/courses').then(r => setMyCourses(r.data.courses || [])).catch(() => {})
       API.get('/students/exams').then(r => setMyExams(r.data.exams || [])).catch(() => {})
     } catch (e) { alert(e.response?.data?.detail || 'Enrollment failed') }
   }
-
   const markRead = async (id) => {
     await API.post(`/notifications/${id}/read`).catch(() => {})
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
     setUnreadCount(c => Math.max(0, c - 1))
   }
 
-  const loadStats = async () => {
-    try {
-      const res = await API.get('/students/stats')
-      setStats({
-        sessions      : res.data.total_sessions   ?? 0,
-        avgEngagement : res.data.avg_engagement   ?? 0,
-        detections    : res.data.total_detections ?? 0,
-      })
-    } catch (err) { console.log('Stats not available') }
-  }
-
-  const loadSessions = async () => {
-    try {
-      const res = await API.get('/students/sessions')
-      setSessions(res.data || [])
-    } catch (err) { console.log('Sessions not available') }
-  }
-
-  // ── Start webcam + microphone ────────────────────────────────────────
   const startWebcam = async () => {
     try {
-      const videoStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user' }
-      })
-      if (videoRef.current) {
-        videoRef.current.srcObject = videoStream
-        await videoRef.current.play()
-      }
-      streamRef.current = videoStream
-      setCameraOn(true)
-
-      // Start microphone — records in 20-second segments for live transcription
+      const videoStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })
+      if (videoRef.current) { videoRef.current.srcObject = videoStream; await videoRef.current.play() }
+      streamRef.current = videoStream; setCameraOn(true)
       try {
-        const audioStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true }
-        })
-        audioStreamRef.current = audioStream
-        startNewRecorder()
-        setMicOn(true)
-
-        // Every 20 seconds: stop recorder → transcribe → restart
+        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+        audioStreamRef.current = audioStream; startNewRecorder(); setMicOn(true)
         audioIntervalRef.current = setInterval(transcribeCurrentChunk, 20000)
-      } catch (micErr) {
-        console.log('Mic not available — face-only mode:', micErr.message)
-        setMicOn(false)
-      }
+      } catch (micErr) { console.log('Mic not available:', micErr.message); setMicOn(false) }
       return true
-    } catch (err) {
-      console.error('Camera error:', err)
-      alert('Could not access camera. Please allow camera permissions.')
-      return false
-    }
+    } catch (err) { console.error('Camera error:', err); alert('Could not access camera.'); return false }
   }
-
   const stopWebcam = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
-      streamRef.current = null
-    }
-    if (videoRef.current) videoRef.current.srcObject = null
-    setCameraOn(false)
-    // Mic is stopped separately in stopSession to grab the audio blob
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null }
+    if (videoRef.current) videoRef.current.srcObject = null; setCameraOn(false)
   }, [])
-
   const stopMic = useCallback(() => {
     if (audioIntervalRef.current) { clearInterval(audioIntervalRef.current); audioIntervalRef.current = null }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try { mediaRecorderRef.current.stop() } catch {}
-    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') { try { mediaRecorderRef.current.stop() } catch {} }
     mediaRecorderRef.current = null
-    if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach(t => t.stop())
-      audioStreamRef.current = null
-    }
+    if (audioStreamRef.current) { audioStreamRef.current.getTracks().forEach(t => t.stop()); audioStreamRef.current = null }
     setMicOn(false)
   }, [])
-
-  // Start a fresh MediaRecorder on the existing audio stream
   const startNewRecorder = () => {
     if (!audioStreamRef.current) return
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus' : 'audio/webm'
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
     const recorder = new MediaRecorder(audioStreamRef.current, { mimeType })
     audioChunksRef.current = []
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) audioChunksRef.current.push(e.data)
-    }
-    recorder.start()
-    mediaRecorderRef.current = recorder
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+    recorder.start(); mediaRecorderRef.current = recorder
   }
-
-  // Stop current recorder → grab complete audio → send to Whisper → append text → restart
   const transcribeCurrentChunk = async () => {
     if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') return
-
-    // Stop recorder and get complete audio blob
     const audioBlob = await new Promise((resolve) => {
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        audioChunksRef.current = []
-        resolve(blob)
-      }
+      mediaRecorderRef.current.onstop = () => { resolve(new Blob(audioChunksRef.current, { type: 'audio/webm' })); audioChunksRef.current = [] }
       mediaRecorderRef.current.stop()
     })
-
-    // Restart recorder immediately for next segment
     startNewRecorder()
-
-    // Send to Whisper if there's meaningful audio
     if (audioBlob.size < 1000) return
-    allAudioBlobsRef.current.push(audioBlob)  // save for voice emotion at end
+    allAudioBlobsRef.current.push(audioBlob)
     try {
-      const form = new FormData()
-      form.append('file', audioBlob, 'chunk.webm')
-      const res = await API.post('/api/transcribe', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 30000,
-      })
-      if (res.data && res.data.success && res.data.text && res.data.text.trim()) {
-        allTranscriptsRef.current.push(res.data.text.trim())
-        setTranscription(allTranscriptsRef.current.join(' '))
-        // Auto-scroll transcript box
-        setTimeout(() => {
-          if (transcriptBoxRef.current) {
-            transcriptBoxRef.current.scrollTop = transcriptBoxRef.current.scrollHeight
-          }
-        }, 100)
+      const form = new FormData(); form.append('file', audioBlob, 'chunk.webm')
+      const res = await API.post('/api/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 30000 })
+      if (res.data?.success && res.data.text?.trim()) {
+        allTranscriptsRef.current.push(res.data.text.trim()); setTranscription(allTranscriptsRef.current.join(' '))
+        setTimeout(() => { if (transcriptBoxRef.current) transcriptBoxRef.current.scrollTop = transcriptBoxRef.current.scrollHeight }, 100)
       }
-    } catch (err) {
-      console.log('Chunk transcription failed:', err.message)
-    }
+    } catch (err) { console.log('Chunk transcription failed:', err.message) }
   }
-
   const stopEverything = useCallback(() => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
     if (durationIntervalRef.current) { clearInterval(durationIntervalRef.current); durationIntervalRef.current = null }
-    stopWebcam()
-    stopMic()
-    audioChunksRef.current = []
-    isAnalyzingRef.current = false
+    stopWebcam(); stopMic(); audioChunksRef.current = []; isAnalyzingRef.current = false
   }, [stopWebcam, stopMic])
 
   const startSession = async () => {
-    const cameraStarted = await startWebcam()
-    if (!cameraStarted) return
-    emotionHistoryRef.current = []
-    detectionCountRef.current = 0
-    setSessionStartTime(Date.now())
-    setSessionDuration(0)
-    setIsSessionActive(true)
-    setCurrentEmotion(null)
-    setEmotionScores({})
-    setEngagement(0)
-    setTranscription('')
-    setTextEmotion(null)
-    setTranscribing(false)
-    allTranscriptsRef.current = []
-    allAudioBlobsRef.current = []
+    const ok = await startWebcam(); if (!ok) return
+    emotionHistoryRef.current = []; detectionCountRef.current = 0
+    setSessionStartTime(Date.now()); setSessionDuration(0); setIsSessionActive(true)
+    setCurrentEmotion(null); setEmotionScores({}); setEngagement(0)
+    setTranscription(''); setTextEmotion(null); setTranscribing(false)
+    allTranscriptsRef.current = []; allAudioBlobsRef.current = []
     try { await API.post('/session/start') } catch {}
     intervalRef.current = setInterval(captureAndAnalyze, 3000)
     setTimeout(captureAndAnalyze, 500)
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // Stop session: stop face detection → stop recorder → grab full audio
-  // → send to Whisper → send text to RoBERTa → save everything
-  // ══════════════════════════════════════════════════════════════════════
   const stopSession = async () => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
-
-    // Stop camera
     stopWebcam()
-
-    // Stop the periodic audio interval
     if (audioIntervalRef.current) { clearInterval(audioIntervalRef.current); audioIntervalRef.current = null }
-
-    // ── Transcribe the final remaining audio chunk ───────────────────
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       setTranscribing(true)
       const finalBlob = await new Promise((resolve) => {
-        mediaRecorderRef.current.onstop = () => {
-          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-          audioChunksRef.current = []
-          resolve(blob)
-        }
+        mediaRecorderRef.current.onstop = () => { resolve(new Blob(audioChunksRef.current, { type: 'audio/webm' })); audioChunksRef.current = [] }
         mediaRecorderRef.current.stop()
       })
-
       if (finalBlob.size > 1000) {
-        allAudioBlobsRef.current.push(finalBlob)  // save final chunk too
+        allAudioBlobsRef.current.push(finalBlob)
         try {
-          const form = new FormData()
-          form.append('file', finalBlob, 'final_chunk.webm')
-          const res = await API.post('/api/transcribe', form, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            timeout: 30000,
-          })
-          if (res.data && res.data.success && res.data.text && res.data.text.trim()) {
-            allTranscriptsRef.current.push(res.data.text.trim())
-            setTranscription(allTranscriptsRef.current.join(' '))
-          }
-        } catch (err) { console.log('Final chunk transcription failed:', err.message) }
+          const form = new FormData(); form.append('file', finalBlob, 'final_chunk.webm')
+          const res = await API.post('/api/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 30000 })
+          if (res.data?.success && res.data.text?.trim()) { allTranscriptsRef.current.push(res.data.text.trim()); setTranscription(allTranscriptsRef.current.join(' ')) }
+        } catch {}
       }
     }
-
-    // Stop mic tracks
-    if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach(t => t.stop())
-      audioStreamRef.current = null
-    }
-    mediaRecorderRef.current = null
-    setMicOn(false)
-
-    // ── Run RoBERTa on the FULL combined transcript ──────────────────
+    if (audioStreamRef.current) { audioStreamRef.current.getTracks().forEach(t => t.stop()); audioStreamRef.current = null }
+    mediaRecorderRef.current = null; setMicOn(false)
     const fullText = allTranscriptsRef.current.join(' ')
     if (fullText.trim()) {
-      try {
-        const robertaRes = await API.post('/api/text-emotion', { text: fullText })
-        if (robertaRes.data && robertaRes.data.success) {
-          setTextEmotion(robertaRes.data)
-        }
-      } catch (err) { console.log('Text emotion failed:', err.message) }
+      try { const r = await API.post('/api/text-emotion', { text: fullText }); if (r.data?.success) setTextEmotion(r.data) } catch {}
     }
-
-    // ── Run wav2vec2 voice tone emotion on combined session audio ─────
     if (allAudioBlobsRef.current.length > 0) {
       try {
-        const combinedAudio = new Blob(allAudioBlobsRef.current, { type: 'audio/webm' })
-        const voiceForm = new FormData()
-        voiceForm.append('file', combinedAudio, 'session_voice.webm')
-        const voiceRes = await API.post('/api/voice-emotion', voiceForm, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 60000,
-        })
-        if (voiceRes.data && voiceRes.data.success) {
-          setVoiceEmotion(voiceRes.data)
-        }
-      } catch (err) { console.log('Voice emotion failed:', err.message) }
+        const combined = new Blob(allAudioBlobsRef.current, { type: 'audio/webm' }); const vf = new FormData(); vf.append('file', combined, 'session_voice.webm')
+        const vr = await API.post('/api/voice-emotion', vf, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 })
+        if (vr.data?.success) setVoiceEmotion(vr.data)
+      } catch {}
     }
-
-    setTranscribing(false)
-
-    setIsSessionActive(false)
-
-    // ── Compute aggregates ───────────────────────────────────────────
-    const history = emotionHistoryRef.current
-    const total = history.length
+    setTranscribing(false); setIsSessionActive(false)
+    const history = emotionHistoryRef.current; const total = history.length
     let avgEng = 0, dominant = 'neutral', distribution = {}, uniqueCount = 0
     if (total > 0) {
-      const sumEng = history.reduce((s, h) => s + (h.engagement_score || 0), 0)
-      avgEng = Math.round((sumEng / total) * 10) / 10
-      const counts = {}
-      history.forEach(h => { counts[h.emotion] = (counts[h.emotion] || 0) + 1 })
+      avgEng = Math.round((history.reduce((s, h) => s + (h.engagement_score || 0), 0) / total) * 10) / 10
+      const counts = {}; history.forEach(h => { counts[h.emotion] = (counts[h.emotion] || 0) + 1 })
       dominant = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b)
-      Object.entries(counts).forEach(([emo, cnt]) => {
-        distribution[emo] = Math.round((cnt / total) * 1000) / 10
-      })
+      Object.entries(counts).forEach(([emo, cnt]) => { distribution[emo] = Math.round((cnt / total) * 1000) / 10 })
       uniqueCount = Object.keys(counts).length
     }
-
-    const finalSessionData = {
-      duration: sessionDuration, totalDetections: total,
-      emotionHistory: history, avgEngagement: avgEng,
-      transcription: allTranscriptsRef.current.join(' '),
-      textEmotion: textEmotion,
-      voiceEmotion: voiceEmotion,
-    }
-    setSessionData(finalSessionData)
-
-    // ── Save to database ─────────────────────────────────────────────
+    setSessionData({ duration: sessionDuration, totalDetections: total, emotionHistory: history, avgEngagement: avgEng, transcription: allTranscriptsRef.current.join(' '), textEmotion, voiceEmotion })
     if (total > 0) {
       setSaving(true)
       try {
         await API.post('/sessions/save', {
           lecture_id: null, avg_engagement: avgEng, overall_engagement: avgEng,
-          dominant_emotion: dominant, total_detections: total, unique_emotions: uniqueCount,
-          distribution: distribution,
+          dominant_emotion: dominant, total_detections: total, unique_emotions: uniqueCount, distribution,
           emotion_logs: history.map(h => ({
             time: h.time || new Date().toISOString(), emotion: h.emotion,
             confidence: (h.confidence || 0) / 100, source: h.source || 'vision',
@@ -414,69 +300,39 @@ export default function StudentDashboard() {
             engagement_score: (h.engagement_score || 0) / 100,
           })),
         })
-      } catch (err) { console.error('Failed to save session to DB:', err) }
+      } catch (err) { console.error('Save failed:', err) }
       setSaving(false)
     }
-
     try { await API.post('/session/end', { duration: sessionDuration, detections: total, avgEngagement: avgEng }) } catch {}
-    setShowReport(true)
-    loadStats()
-    loadSessions()
+    setShowReport(true); loadStats(); loadSessions()
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // Face-only detection every 3 seconds — same as original, untouched
-  // ══════════════════════════════════════════════════════════════════════
   const captureAndAnalyze = async () => {
     if (isAnalyzingRef.current || !videoRef.current || !canvasRef.current) return
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (video.readyState !== 4) return
-    isAnalyzingRef.current = true
-    setIsProcessing(true)
+    const video = videoRef.current; const canvas = canvasRef.current; if (video.readyState !== 4) return
+    isAnalyzingRef.current = true; setIsProcessing(true)
     try {
-      const ctx = canvas.getContext('2d')
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d'); canvas.width = video.videoWidth; canvas.height = video.videoHeight
       ctx.drawImage(video, 0, 0)
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8))
-      const formData = new FormData()
-      formData.append('file', blob, 'frame.jpg')
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000)
-      const res = await API.post('/api/detect-emotion', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        signal: controller.signal,
-      })
-      clearTimeout(timeoutId)
+      const fd = new FormData(); fd.append('file', blob, 'frame.jpg')
+      const controller = new AbortController(); const tid = setTimeout(() => controller.abort(), 15000)
+      const res = await API.post('/api/detect-emotion', fd, { headers: { 'Content-Type': 'multipart/form-data' }, signal: controller.signal })
+      clearTimeout(tid)
       if (res.data) {
         const { dominant, confidence, emotions, engagement: eng } = res.data
-        setCurrentEmotion(dominant)
-        setEmotionScores(emotions || {})
-        setEngagement(eng || confidence || 50)
+        setCurrentEmotion(dominant); setEmotionScores(emotions || {}); setEngagement(eng || confidence || 50)
         detectionCountRef.current += 1
-        emotionHistoryRef.current.push({
-          time: new Date().toISOString(), timestamp: sessionDuration,
-          emotion: dominant, confidence: confidence || 50,
-          scores: emotions || {}, engagement_score: eng || 0, source: 'vision',
-        })
+        emotionHistoryRef.current.push({ time: new Date().toISOString(), timestamp: sessionDuration, emotion: dominant, confidence: confidence || 50, scores: emotions || {}, engagement_score: eng || 0, source: 'vision' })
       }
-    } catch (err) {
-      if (err.name === 'AbortError' || err.name === 'CanceledError') console.log('Request timed out')
-      else console.error('Detection error:', err)
-    } finally {
-      isAnalyzingRef.current = false
-      setIsProcessing(false)
-    }
+    } catch (err) { if (err.name !== 'AbortError' && err.name !== 'CanceledError') console.error('Detection error:', err) }
+    finally { isAnalyzingRef.current = false; setIsProcessing(false) }
   }
-
-  const formatDuration = (s) => { const m = Math.floor(s/60); return `${m}:${(s%60).toString().padStart(2,'0')}` }
 
   const openMyReport = async (sid) => {
     try {
       const res = await API.get(`/students/sessions/${sid}/report`, { responseType: 'blob' })
-      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/html' }))
-      window.open(url, '_blank')
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/html' })); window.open(url, '_blank')
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch { alert('Could not load report.') }
   }
@@ -484,340 +340,382 @@ export default function StudentDashboard() {
     try {
       const res = await API.get(`/students/sessions/${sid}/csv`, { responseType: 'blob' })
       const url = URL.createObjectURL(new Blob([res.data]))
-      const a = document.createElement('a'); a.href = url; a.download = `session_${sid}.csv`
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+      const a = document.createElement('a'); a.href = url; a.download = `session_${sid}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
     } catch { alert('Could not download CSV.') }
   }
 
+  /* ═══════════ Engagement color helper ═══════════ */
+  const engColor = (v) => v >= 65 ? 'var(--engage-high)' : v >= 40 ? 'var(--engage-medium)' : 'var(--engage-low)'
+
+  /* ═══════════ RENDER ═══════════ */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <div className="fixed top-20 left-10 w-72 h-72 bg-blue-600/20 rounded-full blur-3xl animate-float pointer-events-none" />
-      <div className="fixed bottom-20 right-10 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-float-delayed pointer-events-none" />
-      <Navbar />
-      <div className="max-w-7xl mx-auto px-6 py-8 relative z-10">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8 animate-fade-in-up">
-          <div>
-            <h1 className="text-3xl font-black text-white mb-2">
-              Welcome back, <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">{user?.name}</span> 👋
-            </h1>
-            <TypingText texts={['Track your emotions', 'Improve your focus', 'Learn smarter']} speed={60} className="text-gray-400" />
+    <DashboardLayout
+      activeTab={tab}
+      onTabChange={setTab}
+      unreadCount={unreadCount}
+      title={`Overview / ${user?.name || 'Student'}`}
+      headerRight={
+        isSessionActive ? (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/20">
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-recording" />
+            <span className="text-red-400 font-mono text-sm font-semibold">{formatDuration(sessionDuration)}</span>
           </div>
-          <div className="flex gap-4">
-            {[
-              { label: 'Sessions', value: stats.sessions || 0, icon: '📊' },
-              { label: 'Avg Engage', value: `${Math.round(stats.avgEngagement || 0)}%`, icon: '⚡' },
-              { label: 'Detections', value: stats.detections || 0, icon: '🎯' },
-            ].map((stat) => (
-              <GlassCard key={stat.label} className="px-5 py-4 text-center">
-                <div className="text-2xl mb-1">{stat.icon}</div>
-                <div className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">{stat.value}</div>
-                <div className="text-xs text-gray-500">{stat.label}</div>
-              </GlassCard>
-            ))}
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-3 mb-6">
-          {[{ id: 'live', label: '🎥 Live Session' }, { id: 'history', label: '📚 History' }, { id: 'compare', label: '📊 Compare' }, { id: 'courses', label: '📖 My Courses' }, { id: 'notifs', label: `🔔 ${unreadCount > 0 ? `(${unreadCount})` : ''}` }].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`px-6 py-3 rounded-2xl font-medium transition-all duration-300 ${tab === t.id ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg' : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {tab === 'live' && (
-          <div className="space-y-6">
-            {/* Session Controls */}
-            <div className="flex items-center gap-4 flex-wrap">
-              {!isSessionActive ? (
-                <button onClick={startSession} disabled={transcribing}
-                  className="px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 shadow-lg shadow-green-500/30 hover:scale-105 disabled:opacity-60 transition-all duration-300 flex items-center gap-2">
-                  ▶ Start Session
-                </button>
-              ) : (
-                <button onClick={stopSession} disabled={saving}
-                  className="px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 shadow-lg shadow-red-500/30 hover:scale-105 disabled:opacity-60 transition-all duration-300 flex items-center gap-2">
-                  ⏹ Stop Session
-                </button>
-              )}
-              {saving && (
-                <div className="flex items-center gap-2 text-amber-400 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                  <div className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
-                  <span className="text-sm font-medium">Saving session...</span>
+        ) : (
+          <span className="text-xs text-gray-600 bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">No session</span>
+        )
+      }
+    >
+      {/* ═══════════ OVERVIEW TAB ═══════════ */}
+      {tab === 'overview' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Profile card */}
+          <GlassCard className="p-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-indigo-500/20">
+                  {user?.name?.charAt(0)?.toUpperCase() || '?'}
                 </div>
-              )}
-              {transcribing && (
-                <div className="flex items-center gap-2 text-purple-400 px-3 py-2 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-                  <div className="w-3 h-3 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
-                  <span className="text-sm font-medium">Transcribing full session audio...</span>
-                </div>
-              )}
-              {isSessionActive && (
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/30">
-                    <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-red-400 font-mono font-bold">{formatDuration(sessionDuration)}</span>
-                  </div>
-                  {isProcessing && (
-                    <div className="flex items-center gap-2 text-blue-400">
-                      <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
-                      <span className="text-sm">Analyzing...</span>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-gray-500">
-                  <div className={`w-2 h-2 rounded-full ${cameraOn ? 'bg-green-500' : 'bg-gray-500'}`} />
-                  <span className="text-sm">{cameraOn ? 'Camera On' : 'Camera Off'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-500">
-                  <div className={`w-2 h-2 rounded-full ${micOn ? 'bg-purple-500 animate-pulse' : 'bg-gray-500'}`} />
-                  <span className="text-sm">{micOn ? 'Recording Audio' : 'Mic Off'}</span>
+                <div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium">Student Profile &middot; {stats.sessions} sessions</div>
+                  <h2 className="text-2xl font-bold text-white mt-0.5">Welcome back, {user?.name?.split(' ')[0]}.</h2>
+                  <p className="text-sm text-gray-400 mt-0.5">
+                    {stats.avgEngagement >= 65
+                      ? 'Your focus has been strong lately. Keep it up.'
+                      : stats.avgEngagement >= 40
+                        ? 'Solid progress. A few more focused sessions would help.'
+                        : stats.sessions > 0
+                          ? 'Try longer sessions to build engagement momentum.'
+                          : 'Start your first session to begin tracking.'}
+                  </p>
                 </div>
               </div>
+              <div className="flex gap-3">
+                <button onClick={() => setTab('live')} className="btn-primary flex items-center gap-2 text-sm px-5 py-2.5">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Start session
+                </button>
+              </div>
             </div>
+          </GlassCard>
 
-            {/* Main Content */}
-            <div className="grid grid-cols-2 gap-6">
-              {/* Video Feed */}
-              <GlassCard className="p-6">
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">📹 Face Emotion</h2>
-                <div className="relative aspect-video bg-black/50 rounded-2xl overflow-hidden mb-4">
-                  <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                  <canvas ref={canvasRef} className="hidden" />
-                  {!cameraOn && !transcribing && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <div className="text-5xl mb-3">📷</div>
-                      <p className="text-gray-400">Camera off</p>
-                      <p className="text-gray-500 text-sm">Click "Start Session"</p>
-                    </div>
-                  )}
-                  {currentEmotion && cameraOn && (
-                    <div className="absolute top-4 left-4 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/10">
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl">{EMOTION_COLORS[currentEmotion]?.emoji}</span>
-                        <span className="text-white font-bold capitalize">{currentEmotion}</span>
+          {/* Stat cards row */}
+          <div className="grid grid-cols-3 gap-4">
+            <GlassCard variant="stat" accent="indigo" className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Engagement Score</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              </div>
+              <div className="text-3xl font-bold text-white">{Math.round(stats.avgEngagement || 0)}%</div>
+              <div className="mt-2 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${stats.avgEngagement || 0}%`, background: engColor(stats.avgEngagement) }} />
+              </div>
+            </GlassCard>
+
+            <GlassCard variant="stat" accent="teal" className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Focus Duration</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div className="text-3xl font-bold text-white">{formatMinSec(derivedMetrics.avgDuration)}</div>
+              <div className="text-xs text-gray-500 mt-1">avg per session</div>
+            </GlassCard>
+
+            <GlassCard variant="stat" accent="amber" className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Best Performance</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <div className="text-3xl font-bold text-white">{formatHour(derivedMetrics.bestHour)}</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {derivedMetrics.bestHour !== null ? `Peak focus · ${derivedMetrics.bestAvg}% avg` : 'No data yet'}
+              </div>
+            </GlassCard>
+          </div>
+
+          {/* This week's pattern */}
+          <GlassCard className="p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-base font-semibold text-white">This week's pattern</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {derivedMetrics.weeklyData.filter(d => d.sessions > 0).length} active days
+                  {stats.avgEngagement > 0 && `, avg ${Math.round(stats.avgEngagement)}% engagement`}
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                {EMOTION_LEGEND.map(l => (
+                  <div key={l.key} className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full" style={{ background: l.color }} />
+                    <span className="text-[11px] text-gray-500">{l.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-3">
+              {derivedMetrics.weeklyData.map((d, i) => (
+                <div key={d.day} className={`rounded-xl p-3 text-center transition-all ${d.sessions > 0 ? 'glass-subtle hover:bg-white/5' : 'opacity-40'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-400">{d.day}</span>
+                    {d.sessions > 0 && <span className="text-xs font-bold text-white">{d.engagement}%</span>}
+                  </div>
+                  {d.sessions > 0 ? (
+                    <>
+                      <div className="text-[11px] text-gray-600 mb-1">{d.date?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                      {/* Mini emotion bar */}
+                      <div className="flex gap-px h-8 items-end justify-center">
+                        {Object.entries(d.emotions).sort((a,b) => b[1] - a[1]).slice(0, 5).map(([emo, count]) => (
+                          <div key={emo} className="emotion-bar rounded-sm" style={{
+                            width: '6px',
+                            height: `${Math.max(20, (count / d.sessions) * 100)}%`,
+                            background: EMOTION_COLORS[emo]?.hex || '#6b7280',
+                          }} />
+                        ))}
                       </div>
-                    </div>
-                  )}
-                  {isSessionActive && (
-                    <div className="absolute top-4 right-4 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/10">
-                      <div className="text-center">
-                        <div className="text-xl font-bold" style={{ color: engagement >= 60 ? '#22c55e' : engagement >= 40 ? '#eab308' : '#ef4444' }}>
-                          {Math.round(engagement)}%
-                        </div>
-                        <div className="text-xs text-gray-400">Engagement</div>
-                      </div>
-                    </div>
-                  )}
-                  {/* Mic recording indicator on video */}
-                  {micOn && (
-                    <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-lg bg-purple-500/80 backdrop-blur-sm flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                      <span className="text-white text-xs font-medium">Recording voice</span>
-                    </div>
+                      <div className="text-[10px] text-gray-600 mt-1.5">{d.sessions} session{d.sessions > 1 ? 's' : ''}</div>
+                    </>
+                  ) : (
+                    <div className="text-[11px] text-gray-700 mt-4">Rest day</div>
                   )}
                 </div>
-                {currentEmotion && (
-                  <div className="space-y-2">
-                    {Object.entries(emotionScores).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([emotion, score]) => (
-                      <div key={emotion} className="flex items-center gap-2">
-                        <span className="w-6 text-center">{EMOTION_COLORS[emotion]?.emoji}</span>
-                        <span className="w-20 text-gray-400 text-sm capitalize">{emotion}</span>
-                        <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${score}%`, background: EMOTION_COLORS[emotion]?.hex }} />
-                        </div>
-                        <span className="w-12 text-right text-gray-500 text-sm">{Math.round(score)}%</span>
+              ))}
+            </div>
+          </GlassCard>
+
+          {/* Quick recent sessions */}
+          {sessions.length > 0 && (
+            <GlassCard className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-white">Recent sessions</h3>
+                <button onClick={() => setTab('history')} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">View all &rarr;</button>
+              </div>
+              <div className="space-y-2">
+                {sessions.slice(0, 3).map(s => {
+                  const eng = s.avg_engagement || 0
+                  return (
+                    <div key={s.id} className="flex items-center gap-4 p-3 rounded-xl glass-subtle hover:bg-white/5 transition-all">
+                      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500/20 to-blue-500/20 border border-indigo-500/20 flex items-center justify-center text-white text-xs font-bold">
+                        #{s.id}
                       </div>
-                    ))}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white font-medium">{s.started_at ? new Date(s.started_at).toLocaleString() : 'Unknown'}</div>
+                        <div className="text-xs text-gray-500 capitalize">{s.dominant_emotion || 'N/A'} &middot; {s.total_detections || 0} detections</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold" style={{ color: engColor(eng) }}>{Math.round(eng)}%</div>
+                        <div className="text-[10px] text-gray-600">engagement</div>
+                      </div>
+                      <button onClick={() => openMyReport(s.id)} className="px-2.5 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium hover:bg-indigo-500/20 transition-all">Report</button>
+                    </div>
+                  )
+                })}
+              </div>
+            </GlassCard>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════ LIVE SESSION TAB ═══════════ */}
+      {tab === 'live' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Session controls */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {!isSessionActive ? (
+              <button onClick={startSession} disabled={transcribing} className="btn-success flex items-center gap-2 px-6 py-3">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Start Session
+              </button>
+            ) : (
+              <button onClick={stopSession} disabled={saving} className="btn-danger flex items-center gap-2 px-6 py-3">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                Stop Session
+              </button>
+            )}
+            {saving && (
+              <div className="flex items-center gap-2 text-amber-400 px-3 py-2 bg-amber-500/10 border border-amber-500/15 rounded-lg text-sm">
+                <div className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" /> Saving...
+              </div>
+            )}
+            {transcribing && (
+              <div className="flex items-center gap-2 text-indigo-400 px-3 py-2 bg-indigo-500/10 border border-indigo-500/15 rounded-lg text-sm">
+                <div className="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" /> Transcribing...
+              </div>
+            )}
+            <div className="flex items-center gap-4 ml-auto">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <div className={`w-2 h-2 rounded-full ${cameraOn ? 'bg-green-500' : 'bg-gray-600'}`} />
+                {cameraOn ? 'Camera' : 'Off'}
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <div className={`w-2 h-2 rounded-full ${micOn ? 'bg-indigo-500 animate-pulse-soft' : 'bg-gray-600'}`} />
+                {micOn ? 'Recording' : 'Mic off'}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            {/* Video feed */}
+            <GlassCard className="p-5">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Face Emotion</h3>
+              <div className="relative aspect-video bg-black/40 rounded-xl overflow-hidden mb-4">
+                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                <canvas ref={canvasRef} className="hidden" />
+                {!cameraOn && !transcribing && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <p className="text-gray-600 text-sm">Click "Start Session"</p>
                   </div>
                 )}
-              </GlassCard>
-
-              {/* Session Info */}
-              <GlassCard className="p-6">
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">📊 Session Info</h2>
-                {isSessionActive ? (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white/5 rounded-xl p-4 text-center">
-                        <div className="text-3xl font-bold text-white">{detectionCountRef.current}</div>
-                        <div className="text-sm text-gray-500">Detections</div>
+                {currentEmotion && cameraOn && (
+                  <div className="absolute top-3 left-3 px-3 py-1.5 rounded-lg bg-black/50 backdrop-blur-sm border border-white/10 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ background: EMOTION_COLORS[currentEmotion]?.hex }} />
+                    <span className="text-white text-xs font-semibold capitalize">{currentEmotion}</span>
+                  </div>
+                )}
+                {isSessionActive && (
+                  <div className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/50 backdrop-blur-sm border border-white/10 text-center">
+                    <div className="text-lg font-bold" style={{ color: engColor(engagement) }}>{Math.round(engagement)}%</div>
+                    <div className="text-[10px] text-gray-400">Engagement</div>
+                  </div>
+                )}
+                {micOn && (
+                  <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-md bg-indigo-500/70 backdrop-blur-sm flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse-soft" />
+                    <span className="text-white text-[10px] font-medium">Voice</span>
+                  </div>
+                )}
+              </div>
+              {currentEmotion && (
+                <div className="space-y-1.5">
+                  {Object.entries(emotionScores).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([emotion, score]) => (
+                    <div key={emotion} className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: EMOTION_COLORS[emotion]?.hex }} />
+                      <span className="w-16 text-gray-400 text-xs capitalize">{emotion}</span>
+                      <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${score}%`, background: EMOTION_COLORS[emotion]?.hex }} />
                       </div>
-                      <div className="bg-white/5 rounded-xl p-4 text-center">
-                        <div className="text-3xl font-bold" style={{ color: engagement >= 60 ? '#22c55e' : engagement >= 40 ? '#eab308' : '#ef4444' }}>
-                          {Math.round(engagement)}%
-                        </div>
-                        <div className="text-sm text-gray-500">Engagement</div>
-                      </div>
+                      <span className="w-10 text-right text-gray-500 text-xs">{Math.round(score)}%</span>
                     </div>
-                    {currentEmotion && (
-                      <div className="bg-white/5 rounded-xl p-5 text-center">
-                        <div className="text-4xl mb-2">{EMOTION_COLORS[currentEmotion]?.emoji}</div>
-                        <div className="text-xl font-bold text-white capitalize">{currentEmotion}</div>
-                        <div className="text-sm text-gray-500">Current Emotion</div>
-                      </div>
-                    )}
+                  ))}
+                </div>
+              )}
+            </GlassCard>
 
-                    {/* ── Live transcript (like Teams captions) ──────── */}
-                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm">🎤</span>
-                        <span className="text-purple-400 text-xs font-bold uppercase">Live Transcript</span>
-                        <div className="ml-auto flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-                          <span className="text-purple-400 text-xs">Recording</span>
-                        </div>
-                      </div>
-                      <div ref={transcriptBoxRef} className="max-h-32 overflow-y-auto bg-black/20 rounded-lg p-3 min-h-[60px]">
-                        {transcription ? (
-                          <p className="text-gray-300 text-sm leading-relaxed">{transcription}</p>
-                        ) : (
-                          <p className="text-gray-600 text-sm italic">Listening... transcript appears every ~20 seconds</p>
-                        )}
-                      </div>
-                      {allTranscriptsRef.current.length > 0 && (
-                        <div className="text-right mt-1">
-                          <span className="text-gray-600 text-xs">{allTranscriptsRef.current.length} segments</span>
-                        </div>
-                      )}
+            {/* Session info */}
+            <GlassCard className="p-5">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Session Info</h3>
+              {isSessionActive ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="glass-subtle rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold text-white">{detectionCountRef.current}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Detections</div>
                     </div>
-
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                      <p className="text-blue-300 text-sm">
-                        💡 <strong>Tip:</strong> Face analysis runs every 3s. Speech is transcribed every 20s. Full text emotion analysis runs when you stop.
-                      </p>
+                    <div className="glass-subtle rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold" style={{ color: engColor(engagement) }}>{Math.round(engagement)}%</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Engagement</div>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Post-session transcription results */}
-                    {transcription && (
-                      <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <span className="text-lg">🎤</span>
-                          <span className="text-purple-400 text-sm font-bold uppercase">Full Session Transcript</span>
-                        </div>
-                        <div className="max-h-40 overflow-y-auto bg-black/20 rounded-lg p-3">
-                          <p className="text-gray-300 text-sm leading-relaxed">{transcription}</p>
-                        </div>
-
-                        {/* ── Tri-signal emotion summary ──────────────── */}
-                        <div className="mt-3 space-y-2">
-                          {textEmotion && (
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-gray-400 flex items-center gap-1.5">
-                                <span>📝</span> Text Emotion (what you said)
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 capitalize text-xs font-bold">
-                                {textEmotion.emotion} ({Math.round((textEmotion.confidence || 0) * 100)}%)
-                              </span>
-                            </div>
-                          )}
-                          {voiceEmotion && (
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-gray-400 flex items-center gap-1.5">
-                                <span>🔊</span> Voice Emotion (how you sounded)
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 capitalize text-xs font-bold">
-                                {voiceEmotion.emotion} ({Math.round((voiceEmotion.confidence || 0) * 100)}%)
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Per-emotion breakdown from all signals */}
-                        {(textEmotion?.scores || voiceEmotion?.scores) && (
-                          <div className="mt-3 grid grid-cols-2 gap-2">
-                            {textEmotion?.scores && (
-                              <div>
-                                <div className="text-xs text-gray-500 mb-1">📝 Text scores</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {Object.entries(textEmotion.scores).sort((a,b) => b[1]-a[1]).slice(0,4).map(([e,s]) => (
-                                    <span key={e} className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-gray-400 capitalize">
-                                      {EMOTION_COLORS[e]?.emoji||'•'} {e}: {Math.round(s*100)}%
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            {voiceEmotion?.scores && (
-                              <div>
-                                <div className="text-xs text-gray-500 mb-1">🔊 Voice scores</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {Object.entries(voiceEmotion.scores).sort((a,b) => b[1]-a[1]).slice(0,4).map(([e,s]) => (
-                                    <span key={e} className="text-xs px-1.5 py-0.5 rounded bg-white/5 text-gray-400 capitalize">
-                                      {EMOTION_COLORS[e]?.emoji||'•'} {e}: {Math.round(s*100)}%
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
+                  {currentEmotion && (
+                    <div className="glass-subtle rounded-xl p-4 text-center">
+                      <div className="w-3 h-3 rounded-full mx-auto mb-2" style={{ background: EMOTION_COLORS[currentEmotion]?.hex }} />
+                      <div className="text-lg font-bold text-white capitalize">{currentEmotion}</div>
+                      <div className="text-xs text-gray-500">Current Emotion</div>
+                    </div>
+                  )}
+                  {/* Live transcript */}
+                  <div className="glass-subtle rounded-xl p-4 border border-indigo-500/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+                      <span className="text-indigo-400 text-xs font-semibold uppercase tracking-wide">Live Transcript</span>
+                      <div className="ml-auto flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse-soft" /><span className="text-indigo-400 text-[10px]">Recording</span></div>
+                    </div>
+                    <div ref={transcriptBoxRef} className="max-h-28 overflow-y-auto bg-black/20 rounded-lg p-3 min-h-[48px]">
+                      {transcription
+                        ? <p className="text-gray-300 text-xs leading-relaxed">{transcription}</p>
+                        : <p className="text-gray-700 text-xs italic">Listening... transcript appears every ~20s</p>}
+                    </div>
+                  </div>
+                  <div className="glass-subtle rounded-xl p-3">
+                    <p className="text-xs text-gray-500">Face analysis every 3s. Speech transcribed every 20s. Full text emotion runs on stop.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {transcription && (
+                    <div className="glass-subtle rounded-xl p-4 border border-indigo-500/10">
+                      <div className="text-xs font-semibold text-indigo-400 uppercase tracking-wide mb-2">Full Session Transcript</div>
+                      <div className="max-h-36 overflow-y-auto bg-black/20 rounded-lg p-3">
+                        <p className="text-gray-300 text-xs leading-relaxed">{transcription}</p>
+                      </div>
+                      <div className="mt-3 space-y-1.5">
+                        {textEmotion && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500">Text Emotion</span>
+                            <span className="badge badge-primary capitalize">{textEmotion.emotion} ({Math.round((textEmotion.confidence || 0) * 100)}%)</span>
+                          </div>
+                        )}
+                        {voiceEmotion && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500">Voice Emotion</span>
+                            <span className="badge badge-info capitalize">{voiceEmotion.emotion} ({Math.round((voiceEmotion.confidence || 0) * 100)}%)</span>
                           </div>
                         )}
                       </div>
-                    )}
-
-                    {!transcription && (
-                      <div className="text-center py-12">
-                        <div className="text-6xl mb-4">🎯</div>
-                        <h3 className="text-xl font-bold text-white mb-2">Ready to Start?</h3>
-                        <p className="text-gray-400 mb-6">Click "Start Session" to begin emotion tracking.<br />Camera + microphone for multimodal analysis.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </GlassCard>
-            </div>
+                    </div>
+                  )}
+                  {!transcription && (
+                    <div className="text-center py-10">
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" className="mx-auto mb-3">
+                        <circle cx="12" cy="12" r="3"/><path d="M16.95 7.05a7 7 0 0 1 0 9.9"/><path d="M7.05 16.95a7 7 0 0 1 0-9.9"/>
+                      </svg>
+                      <h3 className="text-lg font-semibold text-white mb-1">Ready to start?</h3>
+                      <p className="text-gray-500 text-sm">Camera + microphone for multimodal analysis.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </GlassCard>
           </div>
-        )}
+        </div>
+      )}
 
-        {tab === 'history' && (
+      {/* ═══════════ HISTORY TAB ═══════════ */}
+      {tab === 'history' && (
+        <div className="animate-fade-in">
           <GlassCard className="p-6">
-            <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-              <h2 className="text-xl font-bold text-white">📚 Session History</h2>
-              <button onClick={loadSessions} className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-sm hover:bg-white/10 transition-all duration-300">🔄 Refresh</button>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-semibold text-white">Session History</h3>
+              <button onClick={loadSessions} className="btn-secondary text-xs px-3 py-1.5">Refresh</button>
             </div>
             {sessions.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-5xl mb-4">📊</div>
-                <p className="text-gray-400">No sessions yet. Start your first session!</p>
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" className="mx-auto mb-3"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <p className="text-gray-500">No sessions yet. Start your first one!</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {sessions.map((s) => {
                   const eng = s.avg_engagement || 0
-                  const engC = eng >= 65 ? '#22c55e' : eng >= 40 ? '#eab308' : '#ef4444'
                   return (
-                    <div key={s.id} className="bg-white/5 rounded-xl p-4 border border-white/5 hover:bg-white/10 hover:border-blue-500/30 transition-all duration-300">
-                      <div className="flex items-center justify-between flex-wrap gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-sm font-bold shrink-0">#{s.id}</div>
-                          <div>
-                            <div className="text-white font-medium">{s.started_at ? new Date(s.started_at).toLocaleString() : 'Unknown date'}</div>
-                            <div className="text-gray-500 text-sm capitalize">Dominant: {s.dominant_emotion || 'N/A'}</div>
-                          </div>
+                    <div key={s.id} className="flex items-center gap-4 p-4 rounded-xl glass-subtle hover:bg-white/5 transition-all">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/20 to-blue-500/20 border border-indigo-500/15 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">#{s.id}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white font-medium">{s.started_at ? new Date(s.started_at).toLocaleString() : 'Unknown date'}</div>
+                        <div className="text-xs text-gray-500 capitalize">Dominant: {s.dominant_emotion || 'N/A'}</div>
+                      </div>
+                      <div className="flex items-center gap-5 flex-wrap">
+                        <div className="text-center">
+                          <div className="text-sm font-bold text-blue-400">{s.total_detections || 0}</div>
+                          <div className="text-[10px] text-gray-600">Detections</div>
                         </div>
-                        <div className="flex items-center gap-6 flex-wrap">
-                          <div className="flex gap-6">
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-blue-400">{s.total_detections || 0}</div>
-                              <div className="text-xs text-gray-500">Detections</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg font-bold" style={{ color: engC }}>{Math.round(eng)}%</div>
-                              <div className="text-xs text-gray-500">Engagement</div>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => openMyReport(s.id)} className="px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-medium hover:bg-blue-500/20 transition-all duration-300">📊 Report</button>
-                            <button onClick={() => downloadMyCSV(s.id)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs font-medium hover:bg-white/10 transition-all duration-300">📄 CSV</button>
-                          </div>
+                        <div className="text-center">
+                          <div className="text-sm font-bold" style={{ color: engColor(eng) }}>{Math.round(eng)}%</div>
+                          <div className="text-[10px] text-gray-600">Engagement</div>
                         </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => openMyReport(s.id)} className="px-2.5 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium hover:bg-indigo-500/20 transition-all">Report</button>
+                        <button onClick={() => downloadMyCSV(s.id)} className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/8 text-gray-400 text-xs font-medium hover:bg-white/10 transition-all">CSV</button>
                       </div>
                     </div>
                   )
@@ -825,146 +723,118 @@ export default function StudentDashboard() {
               </div>
             )}
           </GlassCard>
-        )}
+        </div>
+      )}
 
-        {/* ═════════ MY COURSES TAB ═════════ */}
-        {tab === 'courses' && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-white">My Courses</h2>
-              <button onClick={loadAvailableCourses}
-                className="px-4 py-2 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 text-sm hover:bg-blue-500/30 transition-all">
-                + Browse & Enroll
-              </button>
-            </div>
-
-            {showBrowse && (
-              <GlassCard className="p-6">
-                <h3 className="text-white font-bold mb-3">Available Courses</h3>
-                {availableCourses.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No courses available</p>
-                ) : (
-                  <div className="space-y-2">
-                    {availableCourses.map(c => (
-                      <div key={c.id} className="flex items-center justify-between bg-white/5 rounded-xl p-3 border border-white/5">
-                        <div>
-                          <div className="text-white font-medium">{c.name}</div>
-                          <div className="text-gray-500 text-xs">by {c.teacher_name}</div>
-                        </div>
-                        {c.enrolled ? (
-                          <span className="text-green-400 text-xs font-bold">✓ Enrolled</span>
-                        ) : (
-                          <button onClick={() => enrollInCourse(c.id)}
-                            className="px-3 py-1 rounded-lg bg-green-500/20 text-green-400 text-xs font-bold hover:bg-green-500/30">Enroll</button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <button onClick={() => setShowBrowse(false)} className="text-gray-500 text-xs mt-3 hover:text-gray-300">Close</button>
-              </GlassCard>
-            )}
-
-            {myCourses.length === 0 ? (
-              <GlassCard className="p-8 text-center">
-                <div className="text-4xl mb-3">📖</div>
-                <p className="text-gray-400">You're not enrolled in any courses yet.</p>
-                <button onClick={loadAvailableCourses}
-                  className="mt-4 px-6 py-2 rounded-xl bg-blue-500/20 text-blue-400 text-sm hover:bg-blue-500/30">Browse Courses</button>
-              </GlassCard>
-            ) : (
-              myCourses.map(course => {
-                const courseExams = myExams.filter(e => e.course_id === course.id)
-                return (
-                  <GlassCard key={course.id} className="p-6">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="text-white font-bold text-lg">{course.name}</h3>
-                        <p className="text-gray-500 text-xs">by {course.teacher_name}</p>
-                      </div>
-                    </div>
-                    {course.description && <p className="text-gray-400 text-sm mb-4">{course.description}</p>}
-
-                    {courseExams.length === 0 ? (
-                      <p className="text-gray-600 text-sm">No exams posted yet</p>
-                    ) : (
-                      <div className="space-y-2">
-                        <h4 className="text-gray-400 text-xs font-bold uppercase">Exams</h4>
-                        {courseExams.map(ex => (
-                          <div key={ex.id} className={`flex items-center justify-between rounded-xl p-3 border ${ex.submitted ? 'bg-green-500/5 border-green-500/10' : 'bg-white/5 border-white/10'}`}>
-                            <div className="flex-1">
-                              <div className="text-white font-medium text-sm flex items-center gap-2">
-                                {ex.is_proctored && <span className="text-red-400 text-[10px]">🔒</span>}
-                                {ex.title}
-                              </div>
-                              <div className="text-gray-500 text-xs mt-0.5">
-                                {ex.question_count} questions · {Math.floor(ex.time_limit / 60)} min
-                                {ex.due_date && <span className="ml-2">Due: {new Date(ex.due_date).toLocaleDateString()}</span>}
-                              </div>
-                            </div>
-                            {ex.submitted ? (
-                              <div className="text-right">
-                                <div className="text-green-400 text-sm font-bold">{ex.score}%</div>
-                                <div className="text-gray-500 text-[10px]">Focus: {ex.focus_score}%</div>
-                              </div>
-                            ) : (
-                              <button onClick={() => navigate(`/exam?id=${ex.id}`)}
-                                className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs font-bold hover:from-red-400 transition-all">
-                                Take Exam →
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </GlassCard>
-                )
-              })
-            )}
+      {/* ═══════════ COURSES TAB ═══════════ */}
+      {tab === 'courses' && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-semibold text-white">My Courses</h3>
+            <button onClick={loadAvailableCourses} className="btn-secondary text-xs px-3 py-1.5">+ Browse &amp; Enroll</button>
           </div>
-        )}
-
-        {/* ═════════ COMPARE WITH CLASS TAB ═════════ */}
-        {tab === 'compare' && <CompareWithClass />}
-
-        {/* ═════════ NOTIFICATIONS TAB ═════════ */}
-        {tab === 'notifs' && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-white">Notifications</h2>
-              {unreadCount > 0 && (
-                <button onClick={() => { API.post('/notifications/read-all').then(() => { setUnreadCount(0); setNotifications(prev => prev.map(n => ({ ...n, is_read: true }))) }).catch(() => {}) }}
-                  className="text-xs text-blue-400 hover:text-blue-300">Mark all read</button>
+          {showBrowse && (
+            <GlassCard className="p-5">
+              <h4 className="text-sm font-semibold text-white mb-3">Available Courses</h4>
+              {availableCourses.length === 0 ? <p className="text-gray-600 text-sm">No courses available</p> : (
+                <div className="space-y-2">
+                  {availableCourses.map(c => (
+                    <div key={c.id} className="flex items-center justify-between glass-subtle rounded-xl p-3">
+                      <div>
+                        <div className="text-white font-medium text-sm">{c.name}</div>
+                        <div className="text-gray-600 text-xs">by {c.teacher_name}</div>
+                      </div>
+                      {c.enrolled
+                        ? <span className="badge badge-success">Enrolled</span>
+                        : <button onClick={() => enrollInCourse(c.id)} className="px-3 py-1 rounded-lg bg-green-500/15 text-green-400 text-xs font-semibold hover:bg-green-500/25 transition-all">Enroll</button>}
+                    </div>
+                  ))}
+                </div>
               )}
-            </div>
-            {notifications.length === 0 ? (
-              <GlassCard className="p-8 text-center">
-                <div className="text-4xl mb-3">🔔</div>
-                <p className="text-gray-400">No notifications yet</p>
-              </GlassCard>
-            ) : (
-              <div className="space-y-2">
-                {notifications.map(n => (
-                  <GlassCard key={n.id} className={`p-4 cursor-pointer transition-all ${n.is_read ? 'opacity-60' : 'border-l-4 border-l-blue-500'}`}
-                    onClick={() => { markRead(n.id); if (n.link) navigate(n.link) }}>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="text-white font-medium text-sm">{n.title}</div>
-                        <div className="text-gray-400 text-xs mt-1">{n.message}</div>
-                      </div>
-                      <div className="text-gray-600 text-[10px] whitespace-nowrap ml-3">
-                        {n.created_at ? new Date(n.created_at).toLocaleDateString() : ''}
-                      </div>
+              <button onClick={() => setShowBrowse(false)} className="text-gray-600 text-xs mt-3 hover:text-gray-400 transition-colors">Close</button>
+            </GlassCard>
+          )}
+          {myCourses.length === 0 ? (
+            <GlassCard className="p-8 text-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" className="mx-auto mb-3"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              <p className="text-gray-500">Not enrolled in any courses yet.</p>
+              <button onClick={loadAvailableCourses} className="mt-3 btn-secondary text-xs px-4 py-2">Browse Courses</button>
+            </GlassCard>
+          ) : (
+            myCourses.map(course => {
+              const courseExams = myExams.filter(e => e.course_id === course.id)
+              return (
+                <GlassCard key={course.id} className="p-5">
+                  <h4 className="text-white font-semibold">{course.name}</h4>
+                  <p className="text-gray-600 text-xs">by {course.teacher_name}</p>
+                  {course.description && <p className="text-gray-400 text-sm mt-2">{course.description}</p>}
+                  {courseExams.length === 0 ? <p className="text-gray-700 text-xs mt-3">No exams posted yet</p> : (
+                    <div className="mt-3 space-y-2">
+                      <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Exams</span>
+                      {courseExams.map(ex => (
+                        <div key={ex.id} className={`flex items-center justify-between rounded-xl p-3 ${ex.submitted ? 'bg-green-500/5 border border-green-500/10' : 'glass-subtle'}`}>
+                          <div className="flex-1">
+                            <div className="text-sm text-white font-medium">{ex.is_proctored && <span className="text-red-400 text-[10px] mr-1">Proctored</span>}{ex.title}</div>
+                            <div className="text-xs text-gray-600 mt-0.5">{ex.question_count} questions &middot; {Math.floor(ex.time_limit / 60)} min{ex.due_date && ` · Due: ${new Date(ex.due_date).toLocaleDateString()}`}</div>
+                          </div>
+                          {ex.submitted ? (
+                            <div className="text-right">
+                              <div className="text-sm font-bold text-green-400">{ex.score}%</div>
+                              <div className="text-[10px] text-gray-600">Focus: {ex.focus_score}%</div>
+                            </div>
+                          ) : (
+                            <button onClick={() => navigate(`/exam?id=${ex.id}`)} className="btn-danger text-xs px-3 py-1.5">Take Exam</button>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  </GlassCard>
-                ))}
-              </div>
+                  )}
+                </GlassCard>
+              )
+            })
+          )}
+        </div>
+      )}
+
+      {/* ═══════════ COMPARE TAB ═══════════ */}
+      {tab === 'compare' && <CompareWithClass />}
+
+      {/* ═══════════ NOTIFICATIONS TAB ═══════════ */}
+      {tab === 'notifications' && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-semibold text-white">Notifications</h3>
+            {unreadCount > 0 && (
+              <button onClick={() => { API.post('/notifications/read-all').then(() => { setUnreadCount(0); setNotifications(prev => prev.map(n => ({ ...n, is_read: true }))) }).catch(() => {}) }}
+                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Mark all read</button>
             )}
           </div>
-        )}
-      </div>
+          {notifications.length === 0 ? (
+            <GlassCard className="p-8 text-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" className="mx-auto mb-3"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <p className="text-gray-500">No notifications yet</p>
+            </GlassCard>
+          ) : (
+            <div className="space-y-2">
+              {notifications.map(n => (
+                <GlassCard key={n.id} hover={false} className={`p-4 cursor-pointer transition-all hover:bg-white/5 ${n.is_read ? 'opacity-50' : 'border-l-2 border-l-indigo-500'}`}
+                  onClick={() => { markRead(n.id); if (n.link) navigate(n.link) }}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="text-white font-medium text-sm">{n.title}</div>
+                      <div className="text-gray-500 text-xs mt-0.5">{n.message}</div>
+                    </div>
+                    <span className="text-gray-700 text-[10px] whitespace-nowrap ml-3">{n.created_at ? new Date(n.created_at).toLocaleDateString() : ''}</span>
+                  </div>
+                </GlassCard>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {showReport && sessionData && <SessionReport sessionData={sessionData} onClose={() => setShowReport(false)} />}
       <ChatButton />
-    </div>
+    </DashboardLayout>
   )
 }

@@ -1,24 +1,44 @@
-export default function GlassCard({ 
-  children, 
-  className = '', 
+export default function GlassCard({
+  children,
+  className = '',
   hover = true,
-  glow = false 
+  glow = false,
+  accent = null,       // 'indigo' | 'green' | 'amber' | 'red' | 'teal'
+  variant = 'default', // 'default' | 'stat' | 'subtle' | 'heavy'
+  onClick,
 }) {
+  const accentColors = {
+    indigo: 'rgba(99, 102, 241, 0.5)',
+    green:  'rgba(34, 197, 94, 0.5)',
+    amber:  'rgba(245, 158, 11, 0.5)',
+    red:    'rgba(239, 68, 68, 0.5)',
+    teal:   'rgba(20, 184, 166, 0.5)',
+    blue:   'rgba(59, 130, 246, 0.5)',
+  }
+
+  const variantClasses = {
+    default: 'glass',
+    stat:    'card-stat',
+    subtle:  'glass-subtle',
+    heavy:   'glass-heavy',
+  }
+
   return (
-    <div className={`
-      relative overflow-hidden
-      backdrop-blur-xl bg-white/5 
-      border border-white/10
-      rounded-3xl
-      shadow-[0_8px_32px_rgba(0,0,0,0.3)]
-      ${hover ? 'hover:bg-white/10 hover:border-white/20 hover:shadow-[0_8px_40px_rgba(168,85,247,0.2)] hover:scale-[1.02]' : ''}
-      ${glow ? 'shadow-[0_0_40px_rgba(168,85,247,0.3)]' : ''}
-      transition-all duration-500 ease-out
-      ${className}
-    `}>
-      {/* Gradient border effect */}
-      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-500/20 via-transparent to-indigo-500/20 pointer-events-none" />
-      
+    <div
+      onClick={onClick}
+      className={`
+        relative overflow-hidden rounded-2xl
+        ${variantClasses[variant] || 'glass'}
+        ${hover ? 'glass-interactive' : ''}
+        ${glow ? 'glow-indigo' : ''}
+        ${onClick ? 'cursor-pointer' : ''}
+        ${className}
+      `}
+      style={accent ? { '--card-accent': accentColors[accent] || accentColors.indigo } : undefined}
+    >
+      {/* Subtle gradient shimmer at top */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
+
       {/* Content */}
       <div className="relative z-10">
         {children}

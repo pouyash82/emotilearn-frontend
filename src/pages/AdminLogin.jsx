@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import API from '../api'
 
@@ -18,114 +18,76 @@ export default function AdminLogin() {
   const { login } = useAuth()
 
   const handleLogin = async (e) => {
-    e.preventDefault()
+    e?.preventDefault()
     setError('')
-
     if (!ADMIN_EMAILS.includes(email.trim().toLowerCase())) {
       setError('This email is not authorized for admin access.')
       return
     }
-
     setLoading(true)
     try {
-      const res = await API.post('/auth/login', {
-        email: email.trim().toLowerCase(),
-        password,
-      })
-      login(res.data.token, res.data.user)
+      const res = await API.post('/auth/login', { email: email.trim().toLowerCase(), password })
+      login(res.data.user, res.data.access_token)
       navigate('/admin')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Check your credentials.')
-    } finally {
-      setLoading(false)
-    }
+      setError(err.response?.data?.detail || 'Login failed.')
+    } finally { setLoading(false) }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-6">
-      <div className="fixed top-20 right-20 w-72 h-72 bg-purple-600/20 rounded-full blur-3xl animate-float pointer-events-none" />
-      <div className="fixed bottom-40 left-20 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-float-delayed pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative" style={{ background: 'var(--bg-base)' }}>
+      <div className="fixed inset-0 bg-gradient-to-br from-base via-surface/60 to-base z-0" />
+      <div className="fixed top-1/4 right-1/4 w-72 h-72 bg-indigo-600/15 rounded-full blur-[100px] animate-float" />
+      <div className="fixed bottom-1/4 left-1/4 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px] animate-float-delayed" />
 
-      <div className="w-full max-w-md relative z-10">
+      <div className="relative z-10 w-full max-w-md animate-fade-in-up">
         {/* Logo */}
-        <div className="text-center mb-8 animate-fade-in-up">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 mb-4 shadow-lg shadow-purple-500/30">
-            <span className="text-2xl">🛡️</span>
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/20 mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
-          <h1 className="text-3xl font-black text-white">Admin Access</h1>
-          <p className="text-gray-500 text-sm mt-2">EmotiLearn System Administration</p>
+          <h1 className="text-2xl font-bold text-white">Admin Access</h1>
+          <p className="text-gray-600 text-sm mt-1">EmotiLearn System Administration</p>
         </div>
 
-        {/* Login Card */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-          <div onSubmit={handleLogin}>
-            <div className="space-y-5">
-              {/* Email */}
-              <div>
-                <label className="text-sm text-gray-400 mb-1.5 block">Admin Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@medipol.edu.tr"
-                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/50 transition-all"
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="text-sm text-gray-400 mb-1.5 block">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter admin password"
-                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/50 transition-all"
-                />
-              </div>
-
-              {/* Error */}
-              {error && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                  {error}
-                </div>
-              )}
-
-              {/* Submit */}
-              <button
-                onClick={handleLogin}
-                disabled={loading || !email || !password}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:hover:scale-100 transition-all shadow-lg shadow-purple-500/30"
-              >
-                {loading ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Authenticating...
-                  </div>
-                ) : '🔐 Admin Login'}
-              </button>
+        {/* Card */}
+        <div className="glass-heavy rounded-2xl p-7">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5 tracking-wide uppercase">Admin Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@medipol.edu.tr" className="input-glass" />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5 tracking-wide uppercase">Password</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter admin password" className="input-glass"
+                onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+            </div>
+
+            {error && <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-shake">{error}</div>}
+
+            <button onClick={handleLogin} disabled={loading || !email || !password}
+              className="w-full btn-primary py-3 disabled:opacity-40">
+              {loading ? (
+                <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Authenticating...</span>
+              ) : 'Admin Login'}
+            </button>
           </div>
 
-          {/* Authorized Emails */}
-          <div className="mt-6 pt-6 border-t border-white/5">
-            <p className="text-xs text-gray-600 mb-2">Authorized admin accounts:</p>
+          {/* Authorized list */}
+          <div className="mt-5 pt-5 border-t border-white/5">
+            <p className="text-[10px] text-gray-600 uppercase tracking-wider font-medium mb-2">Authorized accounts</p>
             <div className="space-y-1">
               {ADMIN_EMAILS.map(e => (
-                <div key={e} className="text-xs text-gray-500 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500/50" />
-                  {e}
+                <div key={e} className="text-xs text-gray-600 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/40" />{e}
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Back link */}
-        <div className="text-center mt-6">
-          <a href="/login" className="text-gray-500 text-sm hover:text-gray-300 transition-colors">
-            ← Back to regular login
-          </a>
+        <div className="text-center mt-5">
+          <Link to="/login" className="text-gray-600 text-sm hover:text-gray-400 transition-colors">&larr; Back to login</Link>
         </div>
       </div>
     </div>
