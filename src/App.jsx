@@ -9,6 +9,7 @@ import AdminDashboard   from './pages/AdminDashboard'
 import ChatPage         from './pages/ChatPage'
 import ProtectedRoute   from './components/ProtectedRoute'
 import ExamPage         from './pages/ExamPage'
+import { GazeTrackingDemo } from './gaze'
 
 function HomeRedirect() {
   const { user, loading } = useAuth()
@@ -25,6 +26,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/exam" element={<ExamPage />} />
+          <Route path="/gaze-demo" element={<GazeTrackingDemo />} />
           <Route path="/"         element={<HomeRedirect />} />
           <Route path="/login"    element={<Login />} />
           <Route path="/admin-login" element={<AdminLogin />} />

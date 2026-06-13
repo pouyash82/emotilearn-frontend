@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 import DashboardLayout from '../components/DashboardLayout'
 import GlassCard from '../components/GlassCard'
 import SessionReport from '../components/SessionReport'
@@ -8,6 +9,10 @@ import CompareWithClass from '../components/CompareWithClass'
 import ChatButton from '../components/ChatButton'
 import API from '../api'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
+import GazeTracker from '../gaze/GazeTracker'
+import GazeOverlay from '../gaze/GazeOverlay'
+import GazeCalibration from '../gaze/GazeCalibration'
+import EngagementEngine from '../gaze/EngagementEngine'
 
 const EMOTION_COLORS = {
   anger:     { hex: '#ef4444', label: 'Anger' },
@@ -76,6 +81,18 @@ export default function StudentDashboard() {
   const allAudioBlobsRef = useRef([])
   const transcriptBoxRef = useRef(null)
 
+  // ── Gaze tracking state ──
+  const [gazeResult, setGazeResult] = useState(null)
+  const [isCalibrating, setIsCalibrating] = useState(false)
+  const [isGazeCalibrated, setIsGazeCalibrated] = useState(false)
+  const [showGazeOverlay, setShowGazeOverlay] = useState(true)
+  const [engDimensions, setEngDimensions] = useState(null)
+  const gazeTrackerRef = useRef(null)
+  const engagementEngineRef = useRef(null)
+  const faceLandmarkerRef = useRef(null)
+  const gazeLoopRef = useRef(null)
+  const latestLandmarksRef = useRef(null)
+
   useEffect(() => { loadStats(); loadSessions(); return () => { stopEverything() } }, [])
   useEffect(() => {
     if (isSessionActive && sessionStartTime) { durationIntervalRef.current = setInterval(() => { setSessionDuration(Math.floor((Date.now() - sessionStartTime) / 1000)) }, 1000) }
@@ -86,6 +103,33 @@ export default function StudentDashboard() {
     if (tab === 'notifications') { API.get('/notifications').then(r => { setNotifications(r.data.notifications || []); setUnreadCount(r.data.unread || 0) }).catch(() => {}) }
   }, [tab])
   useEffect(() => { API.get('/notifications').then(r => setUnreadCount(r.data.unread || 0)).catch(() => {}) }, [])
+
+  // ── Initialize gaze system ──
+  useEffect(() => {
+    gazeTrackerRef.current = new GazeTracker(window.innerWidth, window.innerHeight)
+    engagementEngineRef.current = new EngagementEngine()
+    // Try restore saved calibration
+    try {
+      const saved = localStorage.getItem('emotilearn_gaze_calibration')
+      if (saved) {
+        const data = JSON.parse(saved)
+        if (data.screenWidth === window.innerWidth && data.screenHeight === window.innerHeight) {
+          if (gazeTrackerRef.current.importCalibration(data)) setIsGazeCalibrated(true)
+        }
+      }
+    } catch (e) {}
+    // Load MediaPipe FaceLandmarker for gaze
+    ;(async () => {
+      try {
+        const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm')
+        faceLandmarkerRef.current = await FaceLandmarker.createFromOptions(vision, {
+          baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task', delegate: 'GPU' },
+          runningMode: 'VIDEO', numFaces: 1, outputFacialTransformationMatrixes: false, outputFaceBlendshapes: false,
+        })
+      } catch (e) { console.warn('FaceLandmarker load failed:', e) }
+    })()
+    return () => { if (gazeLoopRef.current) cancelAnimationFrame(gazeLoopRef.current) }
+  }, [])
 
   /* ── Derived metrics ── */
   const derivedMetrics = (() => {
@@ -142,17 +186,46 @@ export default function StudentDashboard() {
   const stopMic = useCallback(() => { if (audioIntervalRef.current) { clearInterval(audioIntervalRef.current); audioIntervalRef.current = null }; if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') { try { mediaRecorderRef.current.stop() } catch {} }; mediaRecorderRef.current = null; if (audioStreamRef.current) { audioStreamRef.current.getTracks().forEach(t => t.stop()); audioStreamRef.current = null }; setMicOn(false) }, [])
   const startNewRecorder = () => { if (!audioStreamRef.current) return; const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'; const recorder = new MediaRecorder(audioStreamRef.current, { mimeType }); audioChunksRef.current = []; recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }; recorder.start(); mediaRecorderRef.current = recorder }
   const transcribeCurrentChunk = async () => { if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') return; const audioBlob = await new Promise((resolve) => { mediaRecorderRef.current.onstop = () => { resolve(new Blob(audioChunksRef.current, { type: 'audio/webm' })); audioChunksRef.current = [] }; mediaRecorderRef.current.stop() }); startNewRecorder(); if (audioBlob.size < 1000) return; allAudioBlobsRef.current.push(audioBlob); try { const form = new FormData(); form.append('file', audioBlob, 'chunk.webm'); const res = await API.post('/api/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 30000 }); if (res.data?.success && res.data.text?.trim()) { allTranscriptsRef.current.push(res.data.text.trim()); setTranscription(allTranscriptsRef.current.join(' ')); setTimeout(() => { if (transcriptBoxRef.current) transcriptBoxRef.current.scrollTop = transcriptBoxRef.current.scrollHeight }, 100) } } catch {} }
-  const stopEverything = useCallback(() => { if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }; if (durationIntervalRef.current) { clearInterval(durationIntervalRef.current); durationIntervalRef.current = null }; stopWebcam(); stopMic(); audioChunksRef.current = []; isAnalyzingRef.current = false }, [stopWebcam, stopMic])
+  const stopEverything = useCallback(() => { if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }; if (durationIntervalRef.current) { clearInterval(durationIntervalRef.current); durationIntervalRef.current = null }; stopWebcam(); stopMic(); audioChunksRef.current = []; isAnalyzingRef.current = false; if (gazeLoopRef.current) { cancelAnimationFrame(gazeLoopRef.current); gazeLoopRef.current = null } }, [stopWebcam, stopMic])
+
+  // ── Gaze processing loop (runs at ~30fps alongside the 3s backend calls) ──
+  const startGazeLoop = useCallback(() => {
+    const processGaze = () => {
+      const video = videoRef.current
+      const fl = faceLandmarkerRef.current
+      const tracker = gazeTrackerRef.current
+      if (video && fl && tracker && video.readyState >= 2) {
+        try {
+          const result = fl.detectForVideo(video, performance.now())
+          if (result?.faceLandmarks?.[0]) {
+            latestLandmarksRef.current = result.faceLandmarks[0]
+            const gaze = tracker.processLandmarks(result.faceLandmarks[0], video.videoWidth, video.videoHeight)
+            if (gaze) setGazeResult(gaze)
+          }
+        } catch (e) {}
+      }
+      gazeLoopRef.current = requestAnimationFrame(processGaze)
+    }
+    gazeLoopRef.current = requestAnimationFrame(processGaze)
+  }, [])
+
+  const stopGazeLoop = useCallback(() => {
+    if (gazeLoopRef.current) { cancelAnimationFrame(gazeLoopRef.current); gazeLoopRef.current = null }
+  }, [])
 
   const startSession = async () => {
     const ok = await startWebcam(); if (!ok) return
     emotionHistoryRef.current = []; detectionCountRef.current = 0; setSessionStartTime(Date.now()); setSessionDuration(0); setIsSessionActive(true); setCurrentEmotion(null); setEmotionScores({}); setEngagement(0); setTranscription(''); setTextEmotion(null); setTranscribing(false); allTranscriptsRef.current = []; allAudioBlobsRef.current = []; setFaces([]); setClassEng(0); setMultiProfile(null)
+    if (engagementEngineRef.current) engagementEngineRef.current.reset()
+    if (gazeTrackerRef.current) gazeTrackerRef.current.clearHeatmap()
+    startGazeLoop()
     try { await API.post(detectionMode === 'multi' ? '/session/multi/start' : '/session/start') } catch {}
     intervalRef.current = setInterval(captureAndAnalyze, detectionMode === 'multi' ? 1200 : 3000); setTimeout(captureAndAnalyze, 500)
   }
 
   const stopSession = async () => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }; stopWebcam()
+    stopGazeLoop()
     if (audioIntervalRef.current) { clearInterval(audioIntervalRef.current); audioIntervalRef.current = null }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       setTranscribing(true)
@@ -183,7 +256,23 @@ export default function StudentDashboard() {
         if (res.data && res.data.success) { setFaces(res.data.faces || []); setClassEng(res.data.class_engagement || 0); const ff = res.data.faces || []; if (ff.length > 0) { const top = ff[0]; setCurrentEmotion(top.emotion); setEngagement(res.data.class_engagement || 0); detectionCountRef.current += 1; emotionHistoryRef.current.push({ time: new Date().toISOString(), timestamp: sessionDuration, emotion: top.emotion, confidence: top.confidence || 50, scores: {}, engagement_score: res.data.class_engagement || 0, source: 'vision-multi', face_count: ff.length }) } }
         else { setFaces([]); setClassEng(0) }
       } else {
-        const res = await API.post('/api/detect-emotion', fd, { headers: { 'Content-Type': 'multipart/form-data' }, signal: controller.signal }); clearTimeout(tid); if (res.data) { const { dominant, confidence, emotions, engagement: eng } = res.data; setCurrentEmotion(dominant); setEmotionScores(emotions || {}); setEngagement(eng || confidence || 50); detectionCountRef.current += 1; emotionHistoryRef.current.push({ time: new Date().toISOString(), timestamp: sessionDuration, emotion: dominant, confidence: confidence || 50, scores: emotions || {}, engagement_score: eng || 0, source: 'vision' }) }
+        const res = await API.post('/api/detect-emotion', fd, { headers: { 'Content-Type': 'multipart/form-data' }, signal: controller.signal }); clearTimeout(tid); if (res.data) { const { dominant, confidence, emotions, engagement: eng } = res.data; setCurrentEmotion(dominant); setEmotionScores(emotions || {});
+          // Three-dimensional engagement via EngagementEngine
+          const ee = engagementEngineRef.current; const gr = gazeResult
+          if (ee) {
+            const engResult = ee.update({
+              faceEmotion: dominant, faceConfidence: (confidence || 50) / 100,
+              faceProbabilities: emotions ? Object.fromEntries(Object.entries(emotions).map(([k,v]) => [k, v/100])) : null,
+              voiceValence: voiceEmotion?.valence ?? null, textSentiment: textEmotion?.confidence ? (textEmotion.emotion === 'positive' ? textEmotion.confidence : textEmotion.emotion === 'negative' ? -textEmotion.confidence : 0) : null,
+              attentionScore: gr?.attention?.score ?? null,
+              headYaw: gr?.headPose?.yaw ?? null, headPitch: gr?.headPose?.pitch ?? null,
+              fixationStability: gr?.attention?.fixStability ?? null,
+              saccadeRate: gr?.saccadeRate ? gr.saccadeRate / 10 : null,
+            })
+            setEngagement(Math.round(engResult.overallEngagement * 100))
+            setEngDimensions(engResult)
+          } else { setEngagement(eng || confidence || 50) }
+          detectionCountRef.current += 1; emotionHistoryRef.current.push({ time: new Date().toISOString(), timestamp: sessionDuration, emotion: dominant, confidence: confidence || 50, scores: emotions || {}, engagement_score: engagementEngineRef.current ? Math.round(engagementEngineRef.current.getDimensions().overall * 100) : (eng || 0), engagement_state: engDimensions?.engagementState || null, source: 'vision' }) }
       }
     }
     catch {} finally { isAnalyzingRef.current = false; setIsProcessing(false) }
@@ -365,6 +454,19 @@ export default function StudentDashboard() {
             )}
             {saving && <div className="flex items-center gap-2 text-amber-600 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm"><div className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin" /> Saving...</div>}
             {transcribing && <div className="flex items-center gap-2 text-indigo-600 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm"><div className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" /> Transcribing...</div>}
+            {isSessionActive && (
+              <div className="flex items-center gap-2">
+                <button onClick={() => setIsCalibrating(true)} className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 text-xs font-medium hover:bg-blue-100 transition-all flex items-center gap-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+                  {isGazeCalibrated ? 'Recalibrate' : 'Calibrate Gaze'}
+                </button>
+                {isGazeCalibrated && (
+                  <button onClick={() => setShowGazeOverlay(v => !v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${showGazeOverlay ? 'bg-green-50 border border-green-200 text-green-600' : 'bg-gray-50 border border-gray-200 text-gray-500'}`}>
+                    {showGazeOverlay ? '👁 Gaze On' : '👁 Gaze Off'}
+                  </button>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-4 ml-auto">
               <div className="flex items-center gap-2 text-xs text-gray-500"><div className={`w-2 h-2 rounded-full ${cameraOn ? 'bg-green-500' : 'bg-gray-300'}`} />{cameraOn ? 'Camera' : 'Off'}</div>
               <div className="flex items-center gap-2 text-xs text-gray-500"><div className={`w-2 h-2 rounded-full ${micOn ? 'bg-indigo-500 animate-pulse-soft' : 'bg-gray-300'}`} />{micOn ? 'Recording' : 'Mic off'}</div>
@@ -426,6 +528,31 @@ export default function StudentDashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100"><div className="text-2xl font-bold text-slate-700">{detectionCountRef.current}</div><div className="text-xs text-gray-400 mt-0.5">Detections</div></div>
                     <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100"><div className="text-2xl font-bold" style={{ color: engColor(engagement) }}>{Math.round(engagement)}%</div><div className="text-xs text-gray-400 mt-0.5">Engagement</div></div>
+                  </div>
+                  {/* Three-dimensional engagement breakdown */}
+                  {engDimensions && (
+                    <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-4 border border-indigo-100 space-y-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Engagement Dimensions</span>
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white border border-indigo-200 text-indigo-600">{engDimensions.engagementState}</span>
+                      </div>
+                      {[
+                        { label: 'Emotional', value: engDimensions.emotionalScore, color: '#ef4444', icon: '❤️' },
+                        { label: 'Behavioral', value: engDimensions.behavioralScore, color: '#3b82f6', icon: '👁' },
+                        { label: 'Cognitive', value: engDimensions.cognitiveScore, color: '#8b5cf6', icon: '🧠' },
+                      ].map(d => (
+                        <div key={d.label} className="flex items-center gap-2">
+                          <span className="text-xs w-4 text-center">{d.icon}</span>
+                          <span className="text-xs text-gray-500 w-16">{d.label}</span>
+                          <div className="flex-1 h-1.5 bg-white rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${(d.value||0)*100}%`, background: d.color }} /></div>
+                          <span className="text-xs text-gray-500 w-8 text-right">{Math.round((d.value||0)*100)}%</span>
+                        </div>
+                      ))}
+                      {engDimensions.trend && engDimensions.trend !== 'stable' && (
+                        <div className="text-[10px] text-gray-400 text-center mt-1">Trend: {engDimensions.trend === 'rising' ? '📈 Rising' : '📉 Falling'}</div>
+                      )}
+                    </div>
+                  )
                   </div>
                   {currentEmotion && (
                     <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
@@ -628,6 +755,25 @@ export default function StudentDashboard() {
       )}
 
       {showReport && sessionData && <SessionReport sessionData={sessionData} onClose={() => setShowReport(false)} />}
+      {/* Gaze visualization overlay */}
+      <GazeOverlay
+        gazeResult={gazeResult}
+        gazeTracker={gazeTrackerRef.current}
+        visible={isSessionActive && showGazeOverlay && !isCalibrating && isGazeCalibrated}
+        showHeatmap={true}
+        showCircle={true}
+        showScanpath={false}
+        opacity={0.5}
+      />
+      {/* Gaze calibration overlay */}
+      {isCalibrating && (
+        <GazeCalibration
+          gazeTracker={gazeTrackerRef.current}
+          getLandmarks={() => latestLandmarksRef.current ? ({ landmarks: latestLandmarksRef.current, imageWidth: videoRef.current?.videoWidth || 640, imageHeight: videoRef.current?.videoHeight || 480 }) : null}
+          onComplete={(success) => { setIsCalibrating(false); setIsGazeCalibrated(success) }}
+          onCancel={() => setIsCalibrating(false)}
+        />
+      )}
       <ChatButton />
     </DashboardLayout>
   )
