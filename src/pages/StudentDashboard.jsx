@@ -552,8 +552,7 @@ export default function StudentDashboard() {
                         <div className="text-[10px] text-gray-400 text-center mt-1">Trend: {engDimensions.trend === 'rising' ? '📈 Rising' : '📉 Falling'}</div>
                       )}
                     </div>
-                  )
-                  </div>
+                  )}
                   {currentEmotion && (
                     <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
                       <div className="w-3 h-3 rounded-full mx-auto mb-2" style={{ background: EMOTION_COLORS[currentEmotion]?.hex }} />
