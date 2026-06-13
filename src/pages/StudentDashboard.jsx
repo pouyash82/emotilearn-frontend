@@ -148,7 +148,7 @@ export default function StudentDashboard() {
     const ok = await startWebcam(); if (!ok) return
     emotionHistoryRef.current = []; detectionCountRef.current = 0; setSessionStartTime(Date.now()); setSessionDuration(0); setIsSessionActive(true); setCurrentEmotion(null); setEmotionScores({}); setEngagement(0); setTranscription(''); setTextEmotion(null); setTranscribing(false); allTranscriptsRef.current = []; allAudioBlobsRef.current = []; setFaces([]); setClassEng(0); setMultiProfile(null)
     try { await API.post(detectionMode === 'multi' ? '/session/multi/start' : '/session/start') } catch {}
-    intervalRef.current = setInterval(captureAndAnalyze, detectionMode === 'multi' ? 1200 : 3000); setTimeout(captureAndAnalyze, 500)
+    intervalRef.current = setInterval(captureAndAnalyze, detectionMode === 'multi' ? 1200 : 5000); setTimeout(captureAndAnalyze, 500)
   }
 
   const stopSession = async () => {
@@ -177,7 +177,7 @@ export default function StudentDashboard() {
   const captureAndAnalyze = async () => {
     if (isAnalyzingRef.current || !videoRef.current || !canvasRef.current) return; const video = videoRef.current; const canvas = canvasRef.current; if (video.readyState !== 4) return
     isAnalyzingRef.current = true; setIsProcessing(true)
-    try { const ctx = canvas.getContext('2d'); canvas.width = video.videoWidth; canvas.height = video.videoHeight; ctx.drawImage(video, 0, 0); const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8)); const fd = new FormData(); fd.append('file', blob, 'frame.jpg'); const controller = new AbortController(); const tid = setTimeout(() => controller.abort(), 15000)
+    try { const ctx = canvas.getContext('2d'); canvas.width = video.videoWidth; canvas.height = video.videoHeight; ctx.drawImage(video, 0, 0); const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8)); const fd = new FormData(); fd.append('file', blob, 'frame.jpg'); const controller = new AbortController(); const tid = setTimeout(() => controller.abort(), 30000)
       if (detectionMode === 'multi') {
         const res = await API.post('/api/detect-emotion-multi', fd, { headers: { 'Content-Type': 'multipart/form-data' }, signal: controller.signal }); clearTimeout(tid)
         if (res.data && res.data.success) { setFaces(res.data.faces || []); setClassEng(res.data.class_engagement || 0); const ff = res.data.faces || []; if (ff.length > 0) { const top = ff[0]; setCurrentEmotion(top.emotion); setEngagement(res.data.class_engagement || 0); detectionCountRef.current += 1; emotionHistoryRef.current.push({ time: new Date().toISOString(), timestamp: sessionDuration, emotion: top.emotion, confidence: top.confidence || 50, scores: {}, engagement_score: res.data.class_engagement || 0, source: 'vision-multi', face_count: ff.length }) } }
