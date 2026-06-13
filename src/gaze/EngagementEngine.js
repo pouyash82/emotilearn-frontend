@@ -106,7 +106,7 @@ export default class EngagementEngine {
     );
 
     // Dimension 2: Behavioral
-    const [behavioral, bBrk] = this._behavioral(
+    const [behavioral, bBrk, hasBehavioral] = this._behavioral(
       gazeOnScreen, fixationStability, saccadeRate,
       headYaw, headPitch, headStability, attentionScore, blinkRate
     );
@@ -123,11 +123,23 @@ export default class EngagementEngine {
     this._ema.behavioral = a * behavioral + (1 - a) * this._ema.behavioral;
     this._ema.cognitive = a * cognitive + (1 - a) * this._ema.cognitive;
 
+    // Adaptive dimension weights: if no gaze/behavioral signals,
+    // redistribute behavioral weight to emotional + cognitive
+    let wE = this.weights.emotional;
+    let wB = this.weights.behavioral;
+    let wC = this.weights.cognitive;
+    if (!hasBehavioral) {
+      // No gaze data — use only emotional + cognitive
+      wE = 0.60;
+      wB = 0.0;
+      wC = 0.40;
+    }
+
     // Overall
     const overall = clamp(
-      this.weights.emotional * this._ema.emotional +
-      this.weights.behavioral * this._ema.behavioral +
-      this.weights.cognitive * this._ema.cognitive,
+      wE * this._ema.emotional +
+      wB * this._ema.behavioral +
+      wC * this._ema.cognitive,
       0, 1
     );
     this._ema.overall = a * overall + (1 - a) * this._ema.overall;
@@ -250,7 +262,8 @@ export default class EngagementEngine {
       w.blink_rate = 0.10;
     }
 
-    return [clamp(weightedCombine(c, w), 0, 1), roundObj(c)];
+    const hasSignals = Object.keys(c).length > 0;
+    return [clamp(weightedCombine(c, w), 0, 1), roundObj(c), hasSignals];
   }
 
   // ─── Dimension 3: Cognitive ───────────────────────────────
