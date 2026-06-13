@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
-import GazeTracker from '../gaze/GazeTracker'
-import GazeOverlay from '../gaze/GazeOverlay'
-import GazeCalibration from '../gaze/GazeCalibration'
 
 const BACKEND = 'https://web-production-3a26e.up.railway.app'
 const FC = s => s >= 85 ? '#22c55e' : s >= 70 ? '#3b82f6' : s >= 50 ? '#eab308' : '#ef4444'
@@ -97,18 +94,6 @@ export default function ExamPage() {
   const snapTsRef=useRef([]), tmrRef=useRef(null), snapIntRef=useRef(null)
   const t0=useRef(null), lastAns=useRef(null)
 
-  // ── Gaze tracking refs ──
-  const gazeTrackerRef=useRef(null)
-  const gazeFlRef=useRef(null)
-  const gazeLoopRef=useRef(null)
-  const latestLandmarksRef=useRef(null)
-  const gazeAttentionLogRef=useRef([])
-  const [gazeResult,setGazeResult]=useState(null)
-  const [isCalibrating,setIsCalibrating]=useState(false)
-  const [isGazeCalibrated,setIsGazeCalibrated]=useState(false)
-  const [showGazeOverlay,setShowGazeOverlay]=useState(true)
-  const [avgAttention,setAvgAttention]=useState(null)
-
   useEffect(()=>()=>cleanup(),[])
 
   useEffect(()=>{
@@ -138,8 +123,6 @@ export default function ExamPage() {
 
   const cleanup=useCallback(()=>{
     clearInterval(tmrRef.current); clearInterval(snapIntRef.current)
-    if(gazeLoopRef.current){cancelAnimationFrame(gazeLoopRef.current);gazeLoopRef.current=null}
-    if(gazeFlRef.current){try{gazeFlRef.current.close()}catch{};gazeFlRef.current=null}
     if(recRef.current&&recRef.current.state==='recording') try{recRef.current.stop()}catch{}
     if(strRef.current){strRef.current.getTracks().forEach(t=>t.stop());strRef.current=null}
     if(vidRef.current) vidRef.current.srcObject=null
@@ -151,13 +134,6 @@ export default function ExamPage() {
     setAnsTs({}); setAlerts([]); setFocusLog([]); setGapWarns([])
     snapsRef.current=[]; snapTsRef.current=[]; chunksRef.current=[]
     lastAns.current=null; t0.current=Date.now()
-    gazeAttentionLogRef.current=[]
-    // Init gaze tracker
-    gazeTrackerRef.current=new GazeTracker(window.innerWidth,window.innerHeight)
-    try{
-      const saved=localStorage.getItem('emotilearn_gaze_calibration')
-      if(saved){const d=JSON.parse(saved);if(d.screenWidth===window.innerWidth&&d.screenHeight===window.innerHeight){if(gazeTrackerRef.current.importCalibration(d))setIsGazeCalibrated(true)}}
-    }catch{}
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video:{width:640,height:480,facingMode:'user'}, audio:false })
       strRef.current=stream; setPhase('exam')
@@ -174,33 +150,6 @@ export default function ExamPage() {
         snapTsRef.current.push(Math.floor((Date.now()-t0.current)/1000))
         setSnapCount(snapsRef.current.length)
       },3000)
-      // Load FaceLandmarker for real-time gaze during exam
-      ;(async()=>{
-        try{
-          const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm')
-          gazeFlRef.current=await FaceLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',delegate:'GPU'},runningMode:'VIDEO',numFaces:1})
-          // Start gaze loop
-          const processGaze=()=>{
-            const v=vidRef.current,fl=gazeFlRef.current,gt=gazeTrackerRef.current
-            if(v&&fl&&gt&&v.readyState>=2){
-              try{
-                const r=fl.detectForVideo(v,performance.now())
-                if(r?.faceLandmarks?.[0]){
-                  latestLandmarksRef.current=r.faceLandmarks[0]
-                  const g=gt.processLandmarks(r.faceLandmarks[0],v.videoWidth,v.videoHeight)
-                  if(g){
-                    setGazeResult(g)
-                    // Log attention every second
-                    if(g.frameCount%30===0){gazeAttentionLogRef.current.push({ts:Math.floor((Date.now()-t0.current)/1000),attention:g.attention?.score??0,onScreen:g.attention?.isOnScreen??true,yaw:g.headPose?.yaw??0})}
-                  }
-                }
-              }catch{}
-            }
-            gazeLoopRef.current=requestAnimationFrame(processGaze)
-          }
-          gazeLoopRef.current=requestAnimationFrame(processGaze)
-        }catch(e){console.warn('Gaze FaceLandmarker failed:',e)}
-      })()
     } catch(e) { alert('Camera required: '+e.message) }
   }
 
@@ -214,12 +163,6 @@ export default function ExamPage() {
 
   const submitExam=async()=>{
     clearInterval(tmrRef.current); clearInterval(snapIntRef.current)
-    // Stop gaze loop
-    if(gazeLoopRef.current){cancelAnimationFrame(gazeLoopRef.current);gazeLoopRef.current=null}
-    if(gazeFlRef.current){try{gazeFlRef.current.close()}catch{};gazeFlRef.current=null}
-    // Compute avg attention
-    const attnLog=gazeAttentionLogRef.current
-    if(attnLog.length>0){setAvgAttention(Math.round(attnLog.reduce((s,e)=>s+e.attention,0)/attnLog.length*100))}
     if(recRef.current&&recRef.current.state==='recording'){ recRef.current.stop(); await new Promise(r=>setTimeout(r,500)) }
     if(strRef.current){strRef.current.getTracks().forEach(t=>t.stop());strRef.current=null}
     if(vidRef.current) vidRef.current.srcObject=null
@@ -266,7 +209,7 @@ export default function ExamPage() {
     if(backendMode && backendExamId){
       try {
         const token=localStorage.getItem('token')
-        const resp=await fetch(`${BACKEND}/exams/submit`,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({exam_id:backendExamId,answers,focus_score:Math.round(focus),focus_log:log,alerts:warns,answer_timing:ansTs,gap_warnings:gapWarns,duration_sec:Math.floor((Date.now()-t0.current)/1000),gaze_attention_log:gazeAttentionLogRef.current,avg_attention:avgAttention})})
+        const resp=await fetch(`${BACKEND}/exams/submit`,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({exam_id:backendExamId,answers,focus_score:Math.round(focus),focus_log:log,alerts:warns,answer_timing:ansTs,gap_warnings:gapWarns,duration_sec:Math.floor((Date.now()-t0.current)/1000)})})
         const subData=await resp.json().catch(()=>({}))
         if(subData.submission_id&&chunksRef.current.length>0){ const vfd=new FormData(); vfd.append('file',new Blob(chunksRef.current,{type:'video/webm'}),`exam_${subData.submission_id}.webm`); fetch(`${BACKEND}/api/exam/video/${subData.submission_id}`,{method:'POST',body:vfd}).catch(()=>{}) }
       } catch(e){ console.log('Submit save failed:', e) }
@@ -371,24 +314,8 @@ export default function ExamPage() {
             <div className="text-[10px] text-gray-500">Session recorded</div>
             <div className="text-[9px] text-gray-300 mt-0.5">AI analysis runs after submission</div>
           </div>
-          {/* Gaze calibration button */}
-          <button onClick={()=>setIsCalibrating(true)} className="w-full py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 text-[10px] font-medium hover:bg-blue-100 transition-all flex items-center justify-center gap-1.5">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="10"/></svg>
-            {isGazeCalibrated?'Recalibrate':'Calibrate'} Gaze
-          </button>
-          {isGazeCalibrated && gazeResult?.attention && (
-            <div className="glass-subtle rounded-xl p-3 text-center">
-              <div className="text-[10px] text-gray-500 mb-1">Attention</div>
-              <div className="text-lg font-bold" style={{color:gazeResult.attention.score>=0.7?'#22c55e':gazeResult.attention.score>=0.4?'#eab308':'#ef4444'}}>{Math.round(gazeResult.attention.score*100)}%</div>
-              <div className="h-1 bg-gray-200 rounded-full overflow-hidden mt-1"><div className="h-full rounded-full transition-all duration-500" style={{width:`${gazeResult.attention.score*100}%`,background:gazeResult.attention.score>=0.7?'#22c55e':gazeResult.attention.score>=0.4?'#eab308':'#ef4444'}}/></div>
-            </div>
-          )}
         </div>
       </div>
-      {/* Gaze overlay */}
-      <GazeOverlay gazeResult={gazeResult} gazeTracker={gazeTrackerRef.current} visible={showGazeOverlay&&!isCalibrating&&isGazeCalibrated} showHeatmap={false} showCircle={true} opacity={0.4}/>
-      {/* Gaze calibration */}
-      {isCalibrating&&<GazeCalibration gazeTracker={gazeTrackerRef.current} getLandmarks={()=>latestLandmarksRef.current?({landmarks:latestLandmarksRef.current,imageWidth:vidRef.current?.videoWidth||640,imageHeight:vidRef.current?.videoHeight||480}):null} onComplete={s=>{setIsCalibrating(false);setIsGazeCalibrated(s)}} onCancel={()=>setIsCalibrating(false)}/>}
     </div>)}
 
   // ════════════ PROCESSING ════════════
@@ -425,7 +352,7 @@ export default function ExamPage() {
             {[
               {v:`${pct}%`,l:'Exam Score',s:`${correct}/${total}`,c:pct>=70?'#22c55e':pct>=50?'#eab308':'#ef4444'},
               {v:`${focusScore}%`,l:'Focus Score',s:focusScore>=85?'Excellent':focusScore>=70?'Good':focusScore>=50?'Moderate':'Poor',c:FC(focusScore)},
-              {v:avgAttention!=null?`${avgAttention}%`:'N/A',l:'Gaze Attention',s:avgAttention!=null?(avgAttention>=70?'Focused':avgAttention>=40?'Moderate':'Distracted'):'Not calibrated',c:avgAttention!=null?FC(avgAttention):'#6b7280'},
+              {v:`${stats.pct||100}%`,l:'Present',s:`${stats.present||0}/${stats.total||0}`,c:(stats.pct||100)>=90?'#22c55e':'#eab308'},
               {v:alerts.length,l:'Alerts',s:`${hw}h ${ew}e ${aw}a`,c:alerts.length===0?'#22c55e':alerts.length<=5?'#eab308':'#ef4444'},
               {v:gapWarns.length,l:'Timing',s:'flags',c:gapWarns.length===0?'#22c55e':'#ef4444'},
             ].map(x=>(
