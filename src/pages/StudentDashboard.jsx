@@ -75,6 +75,7 @@ export default function StudentDashboard() {
   const allTranscriptsRef = useRef([])
   const allAudioBlobsRef = useRef([])
   const transcriptBoxRef = useRef(null)
+  const speechRecRef = useRef(null)
 
   useEffect(() => { loadStats(); loadSessions(); return () => { stopEverything() } }, [])
   useEffect(() => {
@@ -133,15 +134,37 @@ export default function StudentDashboard() {
       const videoStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })
       if (videoRef.current) { videoRef.current.srcObject = videoStream; await videoRef.current.play() }
       streamRef.current = videoStream; setCameraOn(true)
-      try { const audioStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); audioStreamRef.current = audioStream; startNewRecorder(); setMicOn(true); audioIntervalRef.current = setInterval(transcribeCurrentChunk, 20000) }
+      try { const audioStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); audioStreamRef.current = audioStream; startNewRecorder(); setMicOn(true); startSpeechRecognition() }
       catch (micErr) { setMicOn(false) }
       return true
     } catch { alert('Could not access camera.'); return false }
   }
   const stopWebcam = useCallback(() => { if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null }; if (videoRef.current) videoRef.current.srcObject = null; setCameraOn(false) }, [])
-  const stopMic = useCallback(() => { if (audioIntervalRef.current) { clearInterval(audioIntervalRef.current); audioIntervalRef.current = null }; if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') { try { mediaRecorderRef.current.stop() } catch {} }; mediaRecorderRef.current = null; if (audioStreamRef.current) { audioStreamRef.current.getTracks().forEach(t => t.stop()); audioStreamRef.current = null }; setMicOn(false) }, [])
+  const stopMic = useCallback(() => { if (speechRecRef.current) { try { speechRecRef.current.stop() } catch {} speechRecRef.current = null }; if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') { try { mediaRecorderRef.current.stop() } catch {} }; mediaRecorderRef.current = null; if (audioStreamRef.current) { audioStreamRef.current.getTracks().forEach(t => t.stop()); audioStreamRef.current = null }; setMicOn(false) }, [])
   const startNewRecorder = () => { if (!audioStreamRef.current) return; const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'; const recorder = new MediaRecorder(audioStreamRef.current, { mimeType }); audioChunksRef.current = []; recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }; recorder.start(); mediaRecorderRef.current = recorder }
-  const transcribeCurrentChunk = async () => { if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') return; const audioBlob = await new Promise((resolve) => { mediaRecorderRef.current.onstop = () => { resolve(new Blob(audioChunksRef.current, { type: 'audio/webm' })); audioChunksRef.current = [] }; mediaRecorderRef.current.stop() }); startNewRecorder(); if (audioBlob.size < 1000) return; allAudioBlobsRef.current.push(audioBlob); try { const form = new FormData(); form.append('file', audioBlob, 'chunk.webm'); const res = await API.post('/api/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 30000 }); if (res.data?.success && res.data.text?.trim()) { allTranscriptsRef.current.push(res.data.text.trim()); setTranscription(allTranscriptsRef.current.join(' ')); setTimeout(() => { if (transcriptBoxRef.current) transcriptBoxRef.current.scrollTop = transcriptBoxRef.current.scrollHeight }, 100) } } catch {} }
+  const startSpeechRecognition = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) { console.log('Speech Recognition not supported'); return }
+    const recognition = new SR()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = 'en-US'
+    recognition.onresult = (event) => {
+      let final = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) { final += event.results[i][0].transcript + ' ' }
+      }
+      if (final.trim()) {
+        allTranscriptsRef.current.push(final.trim())
+        setTranscription(allTranscriptsRef.current.join(' '))
+        setTimeout(() => { if (transcriptBoxRef.current) transcriptBoxRef.current.scrollTop = transcriptBoxRef.current.scrollHeight }, 100)
+      }
+    }
+    recognition.onerror = (e) => { if (e.error !== 'no-speech') console.log('Speech error:', e.error) }
+    recognition.onend = () => { if (speechRecRef.current) { try { recognition.start() } catch {} } }
+    recognition.start()
+    speechRecRef.current = recognition
+  }
   const stopEverything = useCallback(() => { if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }; if (durationIntervalRef.current) { clearInterval(durationIntervalRef.current); durationIntervalRef.current = null }; stopWebcam(); stopMic(); audioChunksRef.current = []; isAnalyzingRef.current = false }, [stopWebcam, stopMic])
 
   const startSession = async () => {
@@ -153,11 +176,11 @@ export default function StudentDashboard() {
 
   const stopSession = async () => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }; stopWebcam()
-    if (audioIntervalRef.current) { clearInterval(audioIntervalRef.current); audioIntervalRef.current = null }
+    if (speechRecRef.current) { try { speechRecRef.current.stop() } catch {} speechRecRef.current = null }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       setTranscribing(true)
       const finalBlob = await new Promise((resolve) => { mediaRecorderRef.current.onstop = () => { resolve(new Blob(audioChunksRef.current, { type: 'audio/webm' })); audioChunksRef.current = [] }; mediaRecorderRef.current.stop() })
-      if (finalBlob.size > 1000) { allAudioBlobsRef.current.push(finalBlob); try { const form = new FormData(); form.append('file', finalBlob, 'final_chunk.webm'); const res = await API.post('/api/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 30000 }); if (res.data?.success && res.data.text?.trim()) { allTranscriptsRef.current.push(res.data.text.trim()); setTranscription(allTranscriptsRef.current.join(' ')) } } catch {} }
+      if (finalBlob.size > 1000) { allAudioBlobsRef.current.push(finalBlob) }
     }
     if (audioStreamRef.current) { audioStreamRef.current.getTracks().forEach(t => t.stop()); audioStreamRef.current = null }; mediaRecorderRef.current = null; setMicOn(false)
     const fullText = allTranscriptsRef.current.join(' ')
@@ -439,7 +462,7 @@ export default function StudentDashboard() {
                       <span className="text-indigo-600 text-xs font-semibold uppercase tracking-wide">Live Transcript</span>
                     </div>
                     <div ref={transcriptBoxRef} className="max-h-28 overflow-y-auto bg-white rounded-lg p-3 min-h-[48px] border border-indigo-100">
-                      {transcription ? <p className="text-gray-600 text-xs leading-relaxed">{transcription}</p> : <p className="text-gray-300 text-xs italic">Listening... transcript appears every ~20s</p>}
+                      {transcription ? <p className="text-gray-600 text-xs leading-relaxed">{transcription}</p> : <p className="text-gray-300 text-xs italic">Listening... transcript appears in real-time</p>}
                     </div>
                   </div>
                 </div>
